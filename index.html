@@ -1,0 +1,1072 @@
+<!doctype html>
+<html lang="id">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>GameHub Download</title>
+  <style>
+    :root{
+      --bg:#0b1017; --card:#121824; --muted:#a9b3c7; --text:#e8eefc; --primary:#5b8cff; --primary-2:#4477ff; --danger:#ff5b6b; --warn:#ffb84d; --success:#38d48f; --border:#253046;
+    }
+    *{box-sizing:border-box}
+    html,body{margin:0;height:100%;background:var(--bg);color:var(--text);font-family:Inter,system-ui,-apple-system,Segoe UI,Roboto,Ubuntu,"Helvetica Neue",Arial}
+    a{color:inherit;text-decoration:none}
+    button{cursor:pointer;border:none}
+    .container{max-width:1200px;margin:0 auto;padding:16px}
+
+    /* Navbar */
+    .nav{position:sticky;top:0;z-index:50;background:rgba(11,16,23,.8);backdrop-filter:blur(10px);border-bottom:1px solid var(--border)}
+    .nav-inner{display:flex;align-items:center;gap:12px;justify-content:space-between;padding:12px 16px}
+    .brand{display:flex;align-items:center;gap:10px;font-weight:700}
+    .brand .dot{width:10px;height:10px;border-radius:50%;background:linear-gradient(135deg,var(--primary),#9aaeff)}
+    .nav-actions{display:flex;align-items:center;gap:8px}
+    .btn{padding:10px 14px;border-radius:12px;background:#1a2333;border:1px solid var(--border);color:var(--text)}
+    .btn.primary{background:linear-gradient(180deg,var(--primary),var(--primary-2));border:none;color:white}
+    .btn.ghost{background:transparent}
+    .btn.danger{background:linear-gradient(180deg,#ff6b7a,#ff4d66);color:white;border:none}
+    .btn.warn{background:linear-gradient(180deg,#ffd480,#ffb84d);color:#2b1e00;border:none}
+
+    /* Layout */
+    .grid{display:grid;gap:16px}
+    @media(min-width:640px){.grid{grid-template-columns:repeat(2,1fr)}}
+    @media(min-width:1024px){.grid{grid-template-columns:repeat(3,1fr)}}
+
+    /* Cards */
+    .card{
+      background:linear-gradient(180deg,#0e1420,#0d1320 55%,#0c1324);
+      border:1px solid var(--border);
+      border-radius:18px;
+      overflow:hidden;
+      display:flex;
+      flex-direction:column;
+      box-shadow:0 10px 30px rgba(0,0,0,.25);
+      cursor: pointer;
+      transition: transform 0.2s ease-in-out; /* Added transition for hover effect */
+    }
+    .card:hover {
+      transform: scale(1.03); /* Added scale on hover */
+    }
+    .card img{width:100%;height:180px;object-fit:cover;background:#09101a}
+    .card-body{padding:14px;display:flex;flex-direction:column;gap:10px}
+    .title{font-size:1.05rem;font-weight:700}
+    .muted{color:var(--muted);font-size:.9rem}
+    .price{display:flex;align-items:center;gap:8px;font-weight:700}
+    .price s{color:#7d8798}
+    .chip{font-size:.75rem;padding:4px 8px;border-radius:999px;border:1px solid var(--border);background:#0f1623;color:var(--muted); white-space: nowrap; }
+    .chip.new { background: var(--success); color: white; border-color: var(--success); }
+
+    .actions{margin-top:auto;display:flex;gap:8px}
+    .actions.centered { justify-content: center; }
+
+    /* Admin Panel as floating modal */
+    .admin-modal{
+        position: fixed;
+        inset: 0;
+        z-index: 210; /* Higher than maintenance overlay */
+        background: rgba(0,0,0,.5);
+        display: none;
+        align-items: center;
+        justify-content: center;
+        padding: 20px;
+    }
+    .admin-modal.active{ display: flex; }
+    .admin-panel-container{
+        width: min(1000px, 100%);
+        height: min(90vh, 100%);
+        background: #0f1624;
+        border: 1px solid var(--border);
+        border-radius: 18px;
+        box-shadow: 0 10px 30px rgba(0,0,0,.5);
+        display: grid;
+        grid-template-columns: 260px 1fr;
+        gap: 16px;
+        padding: 12px;
+    }
+    @media(max-width:768px){
+        .admin-panel-container{
+            grid-template-columns: 1fr;
+        }
+        .sidebar{height: auto; max-height: 200px;}
+    }
+
+    .sidebar{position:sticky;top:0;overflow:auto;background:#0c1320;border:1px solid var(--border);border-radius:18px;padding:12px}
+    .side-title{font-size:.9rem;color:var(--muted);margin:8px 10px}
+    .side-btn{width:100%;text-align:left;padding:10px 12px;border-radius:12px;border:1px solid var(--border);background:#0f1624;margin:6px 0}
+    .side-btn.active{outline:2px solid var(--primary)}
+
+    .panel-container{overflow:auto; padding: 0 10px;}
+    .panel{background:#0f1624;border:1px solid var(--border);border-radius:18px;padding:14px}
+    .panel h3{margin:8px 0 12px}
+
+    /* Forms */
+    .field{display:flex;flex-direction:column;gap:6px;margin-bottom:10px}
+    .field input,.field textarea,.field select{background:#0b111b;border:1px solid var(--border);color:var(--text);padding:10px 12px;border-radius:12px}
+    .field input[type="checkbox"] { flex-direction: row; align-items: center; justify-content: start; width: auto; }
+    .row{display:grid;gap:10px}
+    @media(min-width:720px){.row.two{grid-template-columns:1fr 1fr}}
+
+    /* Modals */
+    .modal{position:fixed;inset:0;background:rgba(0,0,0,.5);display:none;align-items:center;justify-content:center;padding:20px;z-index:201; overflow-y: auto;}
+    .modal.active{display:flex}
+    .modal-card{width:min(560px,100%);background:#0f1624;border:1px solid var(--border);border-radius:18px;padding:16px; overflow-y: auto; max-height: 95vh; }
+    .modal-header{display:flex;align-items:center;justify-content:space-between;margin-bottom:10px; flex-shrink: 0;}
+    #modalGameDetails .modal-card{width:min(800px, 100%);}
+    #modalGameDetails .modal-body{display:flex;flex-direction:column;gap:12px; padding-bottom: 20px;}
+    #modalGameDetails .modal-body img{width:100%; height:250px; object-fit: cover; border-radius: 12px;}
+    #modalGameDetails pre{white-space: pre-wrap; font-family: inherit; margin:0; font-size: 0.9rem;}
+
+    /* Maintenance Overlay */
+    .maint{position:fixed;inset:0;display:none;align-items:center;justify-content:center;background:rgba(10,13,22,.9);backdrop-filter:blur(4px);z-index:200}
+    .maint.active{display:flex}
+    .maint-box{background:#10182a;border:1px solid var(--border);padding:20px;border-radius:18px;text-align:center;max-width:520px}
+
+    /* Toast */
+    .toast{position:fixed;bottom:16px;right:16px;display:flex;flex-direction:column;gap:8px;z-index:300}
+    .toast .t{background:#0f1624;border:1px solid var(--border);padding:10px 14px;border-radius:12px;box-shadow:0 10px 25px rgba(0,0,0,.4)}
+
+    /* Download button animation */
+    .btn.download-btn {
+        position: relative;
+        overflow: hidden;
+        transition: transform 0.2s ease-in-out;
+    }
+    .btn.download-btn:active {
+        transform: scale(0.95);
+    }
+    .btn.download-btn::before {
+        content: '';
+        position: absolute;
+        top: 50%;
+        left: 50%;
+        width: 300%;
+        height: 300%;
+        background-color: rgba(255, 255, 255, 0.15);
+        border-radius: 50%;
+        transform: translate(-50%, -50%) scale(0);
+        transition: transform 0.5s ease;
+    }
+    .btn.download-btn:active::before {
+        transform: translate(-50%, -50%) scale(1);
+    }
+
+    .hidden{display:none !important}
+    .link-list {
+      display: flex;
+      flex-direction: column;
+      gap: 8px;
+    }
+    .filters {
+        display: flex;
+        gap: 12px;
+        align-items: center;
+        margin-bottom: 20px;
+    }
+    .filters input, .filters select {
+        flex-grow: 1;
+        background: #0b111b;
+        border: 1px solid var(--border);
+        color: var(--text);
+        padding: 10px 12px;
+        border-radius: 12px;
+    }
+    .filters select {
+        width: 150px;
+        flex-grow: 0;
+    }
+    .comment-list {
+      display: flex;
+      flex-direction: column;
+      gap: 16px;
+    }
+    .comment {
+      border: 1px solid var(--border);
+      background: #0f1624;
+      border-radius: 12px;
+      padding: 12px;
+    }
+    .comment-author {
+      font-weight: bold;
+      margin-bottom: 4px;
+    }
+    .comment-meta {
+      font-size: 0.8rem;
+      color: var(--muted);
+      margin-bottom: 8px;
+    }
+    .comment-actions {
+      display: flex;
+      gap: 8px;
+      margin-top: 8px;
+    }
+    .comment-reply-form {
+        display: none;
+        margin-top: 10px;
+    }
+  </style>
+</head>
+<body>
+  <!-- Maintenance overlay -->
+  <div id="maintOverlay" class="maint">
+    <div class="maint-box">
+      <h2>⚙️ Sedang Maintenance</h2>
+      <p class="muted">Beberapa fitur sementara tidak tersedia. Silakan kembali lagi nanti.</p>
+      <div class="muted" id="maintNote"></div>
+    </div>
+  </div>
+
+  <!-- Admin Panel as a modal -->
+  <div id="adminModal" class="admin-modal">
+    <div class="admin-panel-container">
+        <aside class="sidebar">
+            <div class="modal-header">
+                <h3>Admin Panel</h3>
+                <button class="btn" onclick="closeAdminPanel()">✖</button>
+            </div>
+            <button class="side-btn active" data-panel="panelUpload">Upload Game</button>
+            <button class="side-btn" data-panel="panelManage">Manage Game</button>
+            <button class="side-btn" data-panel="panelComments">Komentar & Report</button>
+            <button class="side-btn" data-panel="panelPlayers">Player Management</button>
+            <button class="side-btn" data-panel="panelSettings">Maintenance</button>
+        </aside>
+        <div class="panel-container">
+            <!-- Upload Game -->
+            <div id="panelUpload" class="panel">
+            <h3 id="panelUploadTitle">Upload Game</h3>
+            <div class="row two">
+                <div>
+                <div class="field"><label>Nama Game</label><input id="gName"/></div>
+                <div class="field"><label>Developer</label><input id="gDev" /></div>
+                <div class="field"><label>Tanggal Rilis</label><input id="gReleaseDate" type="text" placeholder="contoh: 1 Jan 2024"/></div>
+                <div class="field"><label>Kategori</label><input id="gCategory" placeholder="contoh: RPG, FPS, dll"/></div>
+                <div class="field"><label>Deskripsi</label><textarea id="gDesc" rows="4"></textarea></div>
+                <div class="field"><label>Spesifikasi</label><textarea id="gSpecs" rows="4" placeholder="CPU, GPU, RAM, Storage"></textarea></div>
+                </div>
+                <div>
+                <div class="field"><label>Foto (URL)</label><input id="gImage" type="text" placeholder="https://..."/></div>
+                <div class="field">
+                    <label>Link Download</label>
+                    <div id="downloadLinksContainer">
+                    <div class="row" style="align-items:center">
+                        <input type="text" class="download-link" placeholder="URL"/>
+                        <input type="text" class="download-link-text" placeholder="Teks Tombol"/>
+                    </div>
+                    </div>
+                    <button class="btn ghost" id="addDownloadLink">Tambah Link</button>
+                </div>
+                <div class="field">
+                    <label>Terbaru?</label>
+                    <input type="checkbox" id="gIsNew" />
+                </div>
+                </div>
+            </div>
+            <div class="actions">
+                <button class="btn" id="btnCancelEdit" style="display:none">Batal Edit</button>
+                <button class="btn primary" id="btnUploadGame">Simpan</button>
+            </div>
+            </div>
+            <!-- Manage Game -->
+            <div id="panelManage" class="panel hidden">
+            <h3>Daftar Game</h3>
+            <div id="adminGames" class="grid"></div>
+            </div>
+            <!-- Comments & Reports -->
+            <div id="panelComments" class="panel hidden">
+            <h3>Komentar</h3>
+            <div id="adminComments" class="grid"></div>
+            <h3 style="margin-top:16px">Report Produk</h3>
+            <div id="adminReports" class="grid"></div>
+            </div>
+            <!-- Players -->
+            <div id="panelPlayers" class="panel hidden">
+            <h3>Player Management</h3>
+            <div class="row two">
+                <div class="field"><label>Cari user (email/username)</label><input id="playerQuery"/></div>
+                <div class="actions" style="align-items:end"><button class="btn" id="btnSearchPlayer">Cari</button></div>
+            </div>
+            <div id="playersResult" class="grid"></div>
+            </div>
+            <!-- Settings -->
+            <div id="panelSettings" class="panel hidden">
+            <h3>Maintenance</h3>
+            <div class="row two">
+                <div class="field"><label>Status</label><select id="maintSelect"><option value="off">Off</option><option value="on">On</option></select></div>
+                <div class="field"><label>Catatan (opsional)</label><input id="maintMessage" placeholder="Estimasi selesai..."/></div>
+            </div>
+            <div class="actions"><button class="btn warn" id="btnSaveMaint">Simpan</button></div>
+            </div>
+        </div>
+    </div>
+  </div>
+
+
+  <!-- Navbar -->
+  <nav class="nav">
+    <div class="nav-inner container">
+      <div class="brand">
+        <span class="dot"></span>
+        <span>GameHub Download</span>
+        <span class="chip" id="authStatus">Guest</span>
+      </div>
+      <div class="nav-actions">
+        <button class="btn ghost" id="btnHome">Home</button>
+        <button class="btn ghost hidden" id="btnProfile">Profil</button>
+        <button class="btn ghost hidden" id="btnAdmin">Admin</button>
+        <button class="btn primary" id="btnLogin">Login</button>
+        <button class="btn hidden" id="btnLogout">Logout</button>
+      </div>
+    </div>
+  </nav>
+
+  <main class="container">
+    <!-- Home Grid -->
+    <section id="homeSection">
+      <h2>🎮 Game Terbaru</h2>
+      <div class="filters">
+        <input type="text" id="gameSearch" placeholder="Cari game..." />
+        <select id="categoryFilter">
+          <option value="">Semua Kategori</option>
+        </select>
+      </div>
+      <div id="gamesGrid" class="grid" aria-live="polite"></div>
+    </section>
+
+    <!-- Profile -->
+    <section id="profileSection" class="hidden panel">
+      <h3>Profil Saya</h3>
+      <div class="row two">
+        <div>
+          <div class="field"><label>Username</label><input id="profUsername" placeholder="Nama tampilan"></div>
+          <div class="field"><label>Email</label><input id="profEmail" placeholder="Email"></div>
+          <div class="field"><label>Password Baru</label><input id="profPass" type="password" placeholder="(opsional)"></div>
+          <div class="actions"><button class="btn primary" id="btnSaveProfile">Simpan Profil</button></div>
+        </div>
+        <div>
+          <h4>Peringatan dari Admin</h4>
+          <div id="warningsList" class="muted">Tidak ada peringatan.</div>
+          <hr style="border-color:var(--border);margin:12px 0"/>
+          <h4>Teman</h4>
+          <div class="field"><label>Email/Username Teman</label><input id="friendInput" placeholder="contoh: user@mail.com"></div>
+          <div class="actions"><button class="btn" id="btnAddFriend">Tambah Teman</button></div>
+          <div id="friendsList" class="muted"></div>
+        </div>
+      </div>
+    </section>
+  </main>
+
+  <!-- Modals -->
+  <div id="modalAuth" class="modal" aria-hidden="true">
+    <div class="modal-card">
+      <div class="modal-header"><h3>Masuk / Daftar</h3><button class="btn" onclick="closeModal('modalAuth')">✖</button></div>
+      <div class="row two">
+        <div>
+          <h4>Login</h4>
+          <div class="field"><label>Email</label><input id="loginEmail"></div>
+          <div class="field"><label>Password</label><input id="loginPass" type="password"></div>
+          <div class="actions"><button class="btn primary" id="btnDoLogin">Login</button><button class="btn ghost" id="btnForgot">Lupa Password</button></div>
+        </div>
+        <div>
+          <h4>Register</h4>
+          <div class="field"><label>Username</label><input id="regUsername"></div>
+          <div class="field"><label>Email</label><input id="regEmail"></div>
+          <div class="field"><label>Password</label><input id="regPass" type="password"></div>
+          <div class="actions"><button class="btn" id="btnDoRegister">Daftar</button></div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <div id="modalGameDetails" class="modal" aria-hidden="true">
+    <div class="modal-card">
+      <div class="modal-header">
+        <h3 id="modalGameTitle"></h3>
+        <button class="btn" onclick="closeModal('modalGameDetails')">✖</button>
+      </div>
+      <div class="modal-body">
+        <img id="modalGameImage" src="" alt="" />
+        <div class="title" style="font-size: 1.25rem;">Deskripsi Game</div>
+        <pre id="modalGameDesc" class="muted"></pre>
+        <div class="title" style="font-size: 1.25rem;">Spesifikasi</div>
+        <pre id="modalGameSpecs" class="muted"></pre>
+        <div class="title" style="font-size: 1.25rem;">Developer</div>
+        <pre id="modalGameDev" class="muted"></pre>
+        <div class="title" style="font-size: 1.25rem;">Tanggal Rilis</div>
+        <pre id="modalGameReleaseDate" class="muted"></pre>
+        <div class="title" style="font-size: 1.25rem;">Link Download</div>
+        <div id="modalGameLinks" class="link-list"></div>
+        <div class="actions centered">
+          <button class="btn primary" onclick="openCommentModal(this.dataset.gameId)">Komentar</button>
+          <button class="btn danger" onclick="openReportModal(this.dataset.gameId)">Report</button>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <div id="modalCountdown" class="modal" aria-hidden="true">
+    <div class="modal-card">
+      <div class="modal-header">
+        <h3>Memulai Unduhan...</h3>
+        <button class="btn" onclick="closeModal('modalCountdown')">✖</button>
+      </div>
+      <div style="text-align:center; padding: 20px;">
+        <p>Unduhan akan dimulai dalam <span id="countdownTimer" style="font-size: 1.5rem; font-weight: bold;">5</span> detik.</p>
+        <p class="muted">Harap tunggu, jangan tutup halaman ini.</p>
+      </div>
+    </div>
+  </div>
+
+  <div id="modalComment" class="modal" aria-hidden="true">
+    <div class="modal-card">
+      <div class="modal-header">
+        <h3>Komentar</h3>
+        <button class="btn" onclick="closeModal('modalComment')">✖</button>
+      </div>
+      <div id="commentList" class="comment-list"></div>
+      <div class="field">
+        <textarea id="commentText" rows="2" placeholder="Tulis komentar..."></textarea>
+      </div>
+      <div class="actions">
+        <button class="btn primary" id="btnSendComment">Kirim</button>
+      </div>
+    </div>
+  </div>
+
+  <div id="modalReport" class="modal" aria-hidden="true">
+    <div class="modal-card">
+      <div class="modal-header"><h3>Laporkan Produk</h3><button class="btn" onclick="closeModal('modalReport')">✖</button></div>
+      <div class="field"><textarea id="reportText" rows="4" placeholder="Jelaskan masalah…"></textarea></div>
+      <div class="actions"><button class="btn danger" id="btnSendReport">Kirim Laporan</button></div>
+    </div>
+  </div>
+
+  <div id="toast" class="toast" aria-live="polite"></div>
+
+  <!-- Firebase SDKs (Compat for simplicity) -->
+  <script src="https://www.gstatic.com/firebasejs/9.22.2/firebase-app-compat.js"></script>
+  <script src="https://www.gstatic.com/firebasejs/9.22.2/firebase-auth-compat.js"></script>
+  <script src="https://www.gstatic.com/firebasejs/9.22.2/firebase-firestore-compat.js"></script>
+  <script src="https://www.gstatic.com/firebasejs/9.22.2/firebase-storage-compat.js"></script>
+  <script src="https://www.gstatic.com/firebasejs/9.22.2/firebase-analytics-compat.js"></script>
+  <script>
+    // --- Firebase Config ---
+    const firebaseConfig = {
+      apiKey: "AIzaSyAlGXpZSyQab7riDteV5ppS3DXDJQHywKw",
+      authDomain: "modmanagerpro-248f5.firebaseapp.com",
+      projectId: "modmanagerpro-248f5",
+      storageBucket: "modmanagerpro-248f5.firebasestorage.app",
+      messagingSenderId: "594650288669",
+      appId: "1:594650288669:web:3074c3f2f0249bc6f1ecf4",
+      measurementId: "G-VLWZDSRS3W"
+    };
+    firebase.initializeApp(firebaseConfig);
+    const auth = firebase.auth();
+    const db = firebase.firestore();
+    const storage = firebase.storage();
+    try{
+      firebase.analytics();
+    }catch(e){}
+
+    // --- State ---
+    let currentUser = null;
+    let isAdmin = false;
+    let selectedGameIdForComment = null;
+    let selectedGameIdForReport = null;
+    let editingGameId = null; // New state to track if we are editing a game
+    let allCategories = new Set();
+    const gamesCollection = db.collection('games');
+
+    // --- Helpers ---
+    const IDR = new Intl.NumberFormat('id-ID',{style:'currency',currency:'IDR'});
+    const $ = sel => document.querySelector(sel);
+    const $$ = sel => Array.from(document.querySelectorAll(sel));
+
+    function toast(msg){
+      const t = document.createElement('div');
+      t.className = 't';
+      t.textContent = msg;
+      $('#toast').appendChild(t);
+      setTimeout(()=>t.remove(), 4000);
+    }
+
+    function openModal(id){
+      document.getElementById(id).classList.add('active');
+    }
+
+    function closeModal(id){
+      document.getElementById(id).classList.remove('active');
+    }
+
+    function openAdminPanel(){
+      $('#adminModal').classList.add('active');
+    }
+
+    function closeAdminPanel(){
+      $('#adminModal').classList.remove('active');
+    }
+
+    // --- UI Routing ---
+    $('#btnHome').onclick = () => showSection('home');
+    $('#btnProfile').onclick = () => showSection('profile');
+    $('#btnAdmin').onclick = () => openAdminPanel();
+    $('#btnLogin').onclick = () => openModal('modalAuth');
+    $('#btnLogout').onclick = () => auth.signOut();
+
+    function showSection(sectionId){
+      $$('main section').forEach(sec => sec.classList.add('hidden'));
+      document.getElementById(sectionId+'Section').classList.remove('hidden');
+      $$('.nav-actions button').forEach(btn => btn.classList.remove('active'));
+      document.getElementById('btn' + sectionId.charAt(0).toUpperCase() + sectionId.slice(1)).classList.add('active');
+      closeAdminPanel();
+    }
+
+    // --- Authentication ---
+    // Handle login button click
+    $('#btnDoLogin').onclick = async () => {
+        const email = $('#loginEmail').value;
+        const password = $('#loginPass').value;
+        if (!email || !password) {
+            return toast('Email dan password tidak boleh kosong.');
+        }
+        try {
+            await auth.signInWithEmailAndPassword(email, password);
+            toast('Login berhasil!');
+            closeModal('modalAuth');
+        } catch (error) {
+            toast('Gagal login: ' + error.message);
+        }
+    };
+
+    // Handle register button click
+    $('#btnDoRegister').onclick = async () => {
+        const username = $('#regUsername').value;
+        const email = $('#regEmail').value;
+        const password = $('#regPass').value;
+        if (!username || !email || !password) {
+            return toast('Username, email, dan password tidak boleh kosong.');
+        }
+        try {
+            const userCredential = await auth.createUserWithEmailAndPassword(email, password);
+            // Update user profile with username
+            await userCredential.user.updateProfile({
+                displayName: username
+            });
+            // Create user document in Firestore
+            await db.collection('users').doc(userCredential.user.uid).set({
+                username: username,
+                email: email,
+                uid: userCredential.user.uid,
+                warnings: [],
+                friends: []
+            });
+            toast('Registrasi berhasil!');
+            closeModal('modalAuth');
+        } catch (error) {
+            toast('Gagal registrasi: ' + error.message);
+        }
+    };
+
+    // Authentication state change listener
+    auth.onAuthStateChanged(user => {
+      currentUser = user;
+      const adminEmail = "rozaq@gmail.com";
+      isAdmin = user && user.email === adminEmail;
+      
+      if(user){
+        $('#authStatus').textContent = user.displayName || user.email;
+        $('#btnLogin').classList.add('hidden');
+        $('#btnLogout').classList.remove('hidden');
+        $('#btnProfile').classList.remove('hidden');
+        if(isAdmin){
+          $('#btnAdmin').classList.remove('hidden');
+        } else {
+          $('#btnAdmin').classList.add('hidden');
+        }
+        fetchUserProfile(user.uid);
+      } else {
+        $('#authStatus').textContent = 'Guest';
+        $('#btnLogin').classList.remove('hidden');
+        $('#btnLogout').classList.add('hidden');
+        $('#btnProfile').classList.add('hidden');
+        $('#btnAdmin').classList.add('hidden');
+        showSection('home');
+      }
+    });
+
+    // --- Profile Management ---
+    async function fetchUserProfile(uid) {
+      const userDoc = await db.collection('users').doc(uid).get();
+      if (userDoc.exists) {
+        const userData = userDoc.data();
+        $('#profUsername').value = userData.username || '';
+        $('#profEmail').value = userData.email || '';
+        if (userData.warnings) {
+          $('#warningsList').innerHTML = userData.warnings.map(w => `<p>${w.note}</p>`).join('');
+        }
+        if (userData.friends) {
+          $('#friendsList').innerHTML = userData.friends.map(f => `<p>${f}</p>`).join('');
+        }
+      }
+    }
+
+    $('#btnSaveProfile').onclick = async () => {
+      const username = $('#profUsername').value;
+      const newPassword = $('#profPass').value;
+      try {
+        if (currentUser) {
+          await db.collection('users').doc(currentUser.uid).update({ username: username });
+          if (newPassword) {
+            await currentUser.updatePassword(newPassword);
+          }
+          toast('Profil berhasil diperbarui!');
+        }
+      } catch (e) {
+        toast('Gagal memperbarui profil: ' + e.message);
+      }
+    };
+
+    $('#btnAddFriend').onclick = async () => {
+      if (!currentUser) return toast('Silakan login untuk menambahkan teman.');
+      const friendEmail = $('#friendInput').value.trim();
+      if(!friendEmail) return toast('Masukkan email teman.');
+
+      // Find user by email (Firestore query)
+      try {
+        const query = await db.collection('users').where('email', '==', friendEmail).limit(1).get();
+        if(query.empty) return toast('Pengguna tidak ditemukan.');
+
+        const friendDoc = query.docs[0];
+        const friendData = friendDoc.data();
+
+        if (friendData.uid === currentUser.uid) {
+            return toast('Tidak bisa menambahkan diri sendiri sebagai teman.');
+        }
+
+        await db.collection('users').doc(currentUser.uid).update({
+          friends: firebase.firestore.FieldValue.arrayUnion(friendData.username)
+        });
+        toast('Teman berhasil ditambahkan.');
+        fetchUserProfile(currentUser.uid); // Refresh friends list
+      } catch(e) {
+        toast('Gagal menambahkan teman: ' + e.message);
+      }
+    };
+
+    // --- Admin: Maintenance ---
+    $('#btnSaveMaint').onclick = async ()=> {
+      const status = $('#maintSelect').value === 'on';
+      const note = $('#maintMessage').value;
+      try {
+        await db.collection('settings').doc('maintenance').set({
+          enabled: status,
+          note
+        });
+        toast('Status maintenance berhasil diperbarui.');
+      } catch(e) {
+        toast('Gagal memperbarui status maintenance: ' + e.message);
+      }
+    };
+
+    // --- Admin Panel Navigation ---
+    $$('.sidebar .side-btn').forEach(btn => {
+      btn.onclick = () => {
+        $$('.sidebar .side-btn').forEach(b => b.classList.remove('active'));
+        btn.classList.add('active');
+        $$('.admin-panel-container .panel').forEach(p => p.classList.add('hidden'));
+        document.getElementById(btn.dataset.panel).classList.remove('hidden');
+      };
+    });
+
+    // --- Admin: Upload/Edit Game ---
+    $('#btnUploadGame').onclick = async () => {
+      const gameData = {
+        name: $('#gName').value,
+        developer: $('#gDev').value,
+        releaseDate: $('#gReleaseDate').value,
+        category: $('#gCategory').value,
+        description: $('#gDesc').value,
+        specs: $('#gSpecs').value,
+        image: $('#gImage').value,
+        isNew: $('#gIsNew').checked,
+        downloadLinks: $$('.download-link').map((el, i) => ({
+            url: el.value,
+            text: $$('.download-link-text')[i].value || 'Unduh'
+        })).filter(link => link.url)
+      };
+
+      if (!gameData.name || !gameData.downloadLinks.length) {
+        return toast('Nama game dan setidaknya satu link unduhan wajib diisi.');
+      }
+
+      try {
+        if (editingGameId) {
+          await gamesCollection.doc(editingGameId).update(gameData);
+          toast('Game berhasil diperbarui!');
+        } else {
+          await gamesCollection.add(gameData);
+          toast('Game berhasil diunggah!');
+        }
+        clearGameForm();
+        editingGameId = null;
+      } catch (e) {
+        toast('Gagal menyimpan game: ' + e.message);
+      }
+    };
+
+    $('#addDownloadLink').onclick = () => {
+        const container = $('#downloadLinksContainer');
+        const newLinkField = document.createElement('div');
+        newLinkField.className = 'row';
+        newLinkField.style.cssText = 'align-items:center';
+        newLinkField.innerHTML = `
+            <input type="text" class="download-link" placeholder="URL"/>
+            <input type="text" class="download-link-text" placeholder="Teks Tombol"/>
+            <button class="btn danger" onclick="this.parentNode.remove()">✖</button>
+        `;
+        container.appendChild(newLinkField);
+    };
+
+    function clearGameForm() {
+      $('#gName').value = '';
+      $('#gDev').value = '';
+      $('#gReleaseDate').value = '';
+      $('#gCategory').value = '';
+      $('#gDesc').value = '';
+      $('#gSpecs').value = '';
+      $('#gImage').value = '';
+      $('#gIsNew').checked = false;
+      $('#downloadLinksContainer').innerHTML = `
+        <div class="row" style="align-items:center">
+          <input type="text" class="download-link" placeholder="URL"/>
+          <input type="text" class="download-link-text" placeholder="Teks Tombol"/>
+        </div>
+      `;
+      $('#btnCancelEdit').style.display = 'none';
+      $('#panelUploadTitle').textContent = 'Upload Game';
+    }
+
+    function editGame(gameId) {
+        editingGameId = gameId;
+        const gameRef = gamesCollection.doc(gameId);
+        gameRef.get().then(doc => {
+            if (doc.exists) {
+                const data = doc.data();
+                $('#gName').value = data.name;
+                $('#gDev').value = data.developer;
+                $('#gReleaseDate').value = data.releaseDate;
+                $('#gCategory').value = data.category;
+                $('#gDesc').value = data.description;
+                $('#gSpecs').value = data.specs;
+                $('#gImage').value = data.image;
+                $('#gIsNew').checked = data.isNew;
+                
+                const container = $('#downloadLinksContainer');
+                container.innerHTML = '';
+                data.downloadLinks.forEach(link => {
+                    const newLinkField = document.createElement('div');
+                    newLinkField.className = 'row';
+                    newLinkField.style.cssText = 'align-items:center';
+                    newLinkField.innerHTML = `
+                        <input type="text" class="download-link" value="${link.url}" placeholder="URL"/>
+                        <input type="text" class="download-link-text" value="${link.text}" placeholder="Teks Tombol"/>
+                        <button class="btn danger" onclick="this.parentNode.remove()">✖</button>
+                    `;
+                    container.appendChild(newLinkField);
+                });
+                
+                $('#btnCancelEdit').style.display = 'inline-block';
+                $('#panelUploadTitle').textContent = 'Edit Game';
+                $('#btnUploadGame').textContent = 'Simpan Perubahan';
+                $$('.sidebar .side-btn').forEach(b => b.classList.remove('active'));
+                $('[data-panel="panelUpload"]').classList.add('active');
+                $$('.admin-panel-container .panel').forEach(p => p.classList.add('hidden'));
+                $('#panelUpload').classList.remove('hidden');
+            }
+        });
+    }
+
+    $('#btnCancelEdit').onclick = () => {
+        clearGameForm();
+        editingGameId = null;
+        $('#btnUploadGame').textContent = 'Simpan';
+    };
+
+    async function deleteGame(gameId) {
+        if (confirm('Yakin ingin menghapus game ini?')) {
+            try {
+                await gamesCollection.doc(gameId).delete();
+                toast('Game berhasil dihapus!');
+            } catch (e) {
+                toast('Gagal menghapus game: ' + e.message);
+            }
+        }
+    }
+
+    // --- Main Game Grid (Home) ---
+    gamesCollection.onSnapshot(snapshot => {
+      const games = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
+      renderGames(games);
+      renderAdminGames(games);
+      updateCategoryFilter(games);
+    });
+
+    function renderGames(games){
+      const grid = $('#gamesGrid');
+      grid.innerHTML = '';
+      const searchQuery = $('#gameSearch').value.toLowerCase();
+      const categoryFilter = $('#categoryFilter').value;
+      const filteredGames = games.filter(game => {
+          const nameMatch = game.name.toLowerCase().includes(searchQuery);
+          const categoryMatch = categoryFilter === '' || game.category.toLowerCase() === categoryFilter.toLowerCase();
+          return nameMatch && categoryMatch;
+      });
+
+      if (filteredGames.length === 0) {
+        grid.innerHTML = '<div style="grid-column:1/-1;text-align:center;color:var(--muted)">Tidak ada game yang ditemukan.</div>';
+      } else {
+        filteredGames.forEach(game => {
+          const card = document.createElement('div');
+          card.className = 'card';
+          card.innerHTML = `
+            <img src="${game.image || 'https://placehold.co/400x200/121824/a9b3c7?text=No+Image'}" alt="${game.name}" onerror="this.onerror=null;this.src='https://placehold.co/400x200/121824/a9b3c7?text=No+Image'"/>
+            <div class="card-body">
+              <div class="title">${game.name}</div>
+              <div class="muted">${game.developer}</div>
+              <div class="actions">
+                <button class="btn primary" onclick="viewGameDetails('${game.id}')">Detail</button>
+              </div>
+            </div>
+          `;
+          grid.appendChild(card);
+        });
+      }
+    }
+
+    $('#gameSearch').oninput = () => gamesCollection.get().then(snap => renderGames(snap.docs.map(doc => ({ id: doc.id, ...doc.data() }))));
+    $('#categoryFilter').onchange = () => gamesCollection.get().then(snap => renderGames(snap.docs.map(doc => ({ id: doc.id, ...doc.data() }))));
+
+    function updateCategoryFilter(games) {
+      const select = $('#categoryFilter');
+      allCategories.clear();
+      games.forEach(game => {
+        if (game.category) {
+          allCategories.add(game.category);
+        }
+      });
+      select.innerHTML = '<option value="">Semua Kategori</option>';
+      allCategories.forEach(cat => {
+        const option = document.createElement('option');
+        option.value = cat;
+        option.textContent = cat;
+        select.appendChild(option);
+      });
+    }
+
+    // --- Admin Games List ---
+    function renderAdminGames(games){
+        const grid = $('#adminGames');
+        grid.innerHTML = '';
+        games.forEach(game => {
+            const card = document.createElement('div');
+            card.className = 'card';
+            card.innerHTML = `
+              <img src="${game.image || 'https://placehold.co/400x200/121824/a9b3c7?text=No+Image'}" alt="${game.name}" onerror="this.onerror=null;this.src='https://placehold.co/400x200/121824/a9b3c7?text=No+Image'"/>
+              <div class="card-body">
+                <div class="title">${game.name}</div>
+                <div class="muted">${game.developer}</div>
+                <div class="actions">
+                  <button class="btn primary" onclick="editGame('${game.id}')">Edit</button>
+                  <button class="btn danger" onclick="deleteGame('${game.id}')">Hapus</button>
+                </div>
+              </div>
+            `;
+            grid.appendChild(card);
+        });
+    }
+
+    // --- Modals ---
+    async function viewGameDetails(gameId){
+      const gameDoc = await gamesCollection.doc(gameId).get();
+      if(!gameDoc.exists) return toast('Game tidak ditemukan.');
+      const gameData = gameDoc.data();
+      
+      $('#modalGameTitle').textContent = gameData.name;
+      $('#modalGameImage').src = gameData.image || 'https://placehold.co/800x250/121824/a9b3c7?text=No+Image';
+      $('#modalGameDesc').textContent = gameData.description;
+      $('#modalGameSpecs').textContent = gameData.specs;
+      $('#modalGameDev').textContent = gameData.developer;
+      $('#modalGameReleaseDate').textContent = gameData.releaseDate;
+      
+      const linkContainer = $('#modalGameLinks');
+      linkContainer.innerHTML = '';
+      if (gameData.downloadLinks && gameData.downloadLinks.length > 0) {
+        gameData.downloadLinks.forEach(link => {
+            const linkButton = document.createElement('a');
+            linkButton.href = link.url;
+            linkButton.target = "_blank";
+            linkButton.className = 'btn download-btn primary';
+            linkButton.textContent = link.text || 'Unduh';
+            linkContainer.appendChild(linkButton);
+        });
+      } else {
+          linkContainer.innerHTML = `<span class="muted">Tidak ada link unduhan.</span>`;
+      }
+
+      $('#modalGameDetails').querySelector('.actions button').dataset.gameId = gameId;
+      $('#modalGameDetails').querySelector('.actions button.danger').dataset.gameId = gameId;
+      openModal('modalGameDetails');
+    }
+
+    // --- Komentar ---
+    const commentsCollection = db.collection('comments');
+
+    async function openCommentModal(gameId) {
+      selectedGameIdForComment = gameId;
+      $('#modalComment').dataset.gameId = gameId;
+      openModal('modalComment');
+      fetchComments(gameId);
+    }
+
+    async function fetchComments(gameId) {
+      const commentList = $('#commentList');
+      commentList.innerHTML = 'Memuat komentar...';
+      const q = commentsCollection.where('gameId', '==', gameId).orderBy('timestamp', 'desc');
+
+      try {
+        const snapshot = await q.get();
+        commentList.innerHTML = '';
+        if (snapshot.empty) {
+          commentList.innerHTML = '<div class="muted">Belum ada komentar. Jadilah yang pertama!</div>';
+        } else {
+          snapshot.forEach(doc => {
+            const commentData = doc.data();
+            const commentElement = document.createElement('div');
+            commentElement.className = 'comment';
+            commentElement.innerHTML = `
+              <div class="comment-author">${commentData.author}</div>
+              <div class="comment-meta">${new Date(commentData.timestamp).toLocaleString()}</div>
+              <div>${commentData.text}</div>
+              <div class="comment-actions">
+                ${currentUser && commentData.authorId === currentUser.uid ? `<button class="btn danger" onclick="deleteComment('${doc.id}')">Hapus</button>` : ''}
+                ${isAdmin ? `<button class="btn danger" onclick="deleteComment('${doc.id}')">Hapus</button>` : ''}
+              </div>
+            `;
+            commentList.appendChild(commentElement);
+          });
+        }
+      } catch (e) {
+        toast('Gagal memuat komentar: ' + e.message);
+        commentList.innerHTML = `<div class="muted">Gagal memuat komentar.</div>`;
+      }
+    }
+
+    $('#btnSendComment').onclick = async () => {
+      if (!currentUser) return toast('Silakan login untuk mengirim komentar.');
+      const commentText = $('#commentText').value.trim();
+      if (!commentText) return toast('Komentar tidak boleh kosong.');
+
+      try {
+        await commentsCollection.add({
+          gameId: selectedGameIdForComment,
+          author: currentUser.displayName || currentUser.email,
+          authorId: currentUser.uid,
+          text: commentText,
+          timestamp: Date.now()
+        });
+        $('#commentText').value = '';
+        toast('Komentar berhasil dikirim!');
+        fetchComments(selectedGameIdForComment);
+      } catch (e) {
+        toast('Gagal mengirim komentar: ' + e.message);
+      }
+    };
+
+    async function deleteComment(commentId) {
+      if (!currentUser) return toast('Anda tidak punya izin.');
+      try {
+        const commentRef = commentsCollection.doc(commentId);
+        const commentDoc = await commentRef.get();
+        if (!commentDoc.exists) return toast('Komentar tidak ditemukan.');
+
+        const commentData = commentDoc.data();
+        if (commentData.authorId === currentUser.uid || isAdmin) {
+          await commentRef.delete();
+          toast('Komentar berhasil dihapus.');
+          fetchComments(selectedGameIdForComment);
+        } else {
+          toast('Anda tidak punya izin untuk menghapus komentar ini.');
+        }
+      } catch (e) {
+        toast('Gagal menghapus komentar: ' + e.message);
+      }
+    }
+    
+    // --- Laporan ---
+    const reportsCollection = db.collection('reports');
+
+    function openReportModal(gameId) {
+        selectedGameIdForReport = gameId;
+        openModal('modalReport');
+    }
+
+    $('#btnSendReport').onclick = async () => {
+        if (!currentUser) return toast('Silakan login untuk mengirim laporan.');
+        const reportText = $('#reportText').value.trim();
+        if (!reportText) return toast('Deskripsi laporan tidak boleh kosong.');
+
+        try {
+            await reportsCollection.add({
+                gameId: selectedGameIdForReport,
+                reporterId: currentUser.uid,
+                reporterName: currentUser.displayName || currentUser.email,
+                reportText: reportText,
+                timestamp: Date.now()
+            });
+            $('#reportText').value = '';
+            closeModal('modalReport');
+            toast('Laporan berhasil dikirim!');
+        } catch (e) {
+            toast('Gagal mengirim laporan: ' + e.message);
+        }
+    };
+
+    reportsCollection.onSnapshot(snapshot => {
+      const reports = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
+      renderAdminReports(reports);
+    });
+
+    function renderAdminReports(reports) {
+      const grid = $('#adminReports');
+      grid.innerHTML = '';
+      if (reports.length === 0) {
+        grid.innerHTML = '<div style="grid-column:1/-1;text-align:center;color:var(--muted)">Tidak ada laporan.</div>';
+      } else {
+        reports.forEach(report => {
+          const card = document.createElement('div');
+          card.className = 'card';
+          card.innerHTML = `
+            <div class="card-body">
+              <div class="title">Laporan dari ${report.reporterName}</div>
+              <div class="muted">Game ID: ${report.gameId}</div>
+              <div class="muted">Masalah:</div>
+              <pre>${report.reportText}</pre>
+              <div class="actions">
+                <button class="btn danger" onclick="deleteReport('${report.id}')">Hapus Laporan</button>
+              </div>
+            </div>
+          `;
+          grid.appendChild(card);
+        });
+      }
+    }
+
+    async function deleteReport(reportId) {
+      if (!isAdmin) return toast('Anda tidak punya izin.');
+      try {
+        await reportsCollection.doc(reportId).delete();
+        toast('Laporan berhasil dihapus.');
+      } catch (e) {
+        toast('Gagal menghapus laporan: ' + e.message);
+      }
+    }
+  </script>
+</body>
+</html>
