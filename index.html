@@ -13,12 +13,13 @@
     <!-- Firebase SDKs -->
     <script type="module">
         import { initializeApp } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-app.js";
-        import { getAuth, signInAnonymously, signInWithCustomToken, onAuthStateChanged, signInWithEmailAndPassword, signOut, createUserWithEmailAndPassword } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-auth.js";
+        import { getAuth, signInAnonymously, signInWithCustomToken, onAuthStateChanged, signInWithEmailAndPassword, signOut, createUserWithEmailAndPassword, GoogleAuthProvider, signInWithPopup, fetchSignInMethodsForEmail } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-auth.js";
         import { getFirestore, doc, getDoc, setDoc, onSnapshot, collection, query, where, getDocs, updateDoc, addDoc, deleteDoc } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-firestore.js";
 
         // Global variables provided by the environment
         const appId = typeof __app_id !== 'undefined' ? __app_id : 'default-app-id';
-        const firebaseConfig = JSON.parse(typeof __firebase_config !== 'undefined' ? __firebase_config : '{}');
+        // FIX: The firebaseConfig needs to be parsed correctly.
+        const firebaseConfig = typeof __firebase_config !== 'undefined' ? JSON.parse(__firebase_config) : {};
         const initialAuthToken = typeof __initial_auth_token !== 'undefined' ? __initial_auth_token : null;
 
         // Initialize Firebase
@@ -275,11 +276,35 @@
             document.getElementById('login-modal').style.display = 'none';
         };
 
+        // NEW: Handle specific auth errors for a better user experience
+        const handleAuthError = async (error, email) => {
+            if (error.code === 'auth/wrong-password') {
+                showMessage("Kata sandi salah. Silakan coba lagi.", "error");
+            } else if (error.code === 'auth/user-not-found') {
+                showMessage("Tidak ada akun dengan email ini. Silakan daftar terlebih dahulu.", "error");
+            } else if (error.code === 'auth/invalid-email') {
+                showMessage("Format email tidak valid.", "error");
+            } else if (error.code === 'auth/operation-not-allowed') {
+                // This is the core fix for the issue
+                try {
+                    const signInMethods = await fetchSignInMethodsForEmail(auth, email);
+                    if (signInMethods.includes(GoogleAuthProvider.PROVIDER_ID)) {
+                        showMessage("Akun ini terdaftar dengan Google. Silakan masuk menggunakan akun Google.", "error");
+                    } else {
+                        showMessage("Operasi tidak diizinkan. Ini bisa terjadi jika akun dibuat dengan metode lain. Coba lagi atau daftar dengan email yang berbeda.", "error");
+                    }
+                } catch (e) {
+                    showMessage("Login gagal. Terjadi kesalahan. Silakan coba lagi.", "error");
+                }
+            } else {
+                showMessage(`Login gagal: ${error.message}.`, "error");
+            }
+        };
+
         window.login = async () => {
             const email = document.getElementById('login-email').value;
             const password = document.getElementById('login-password').value;
             try {
-                // Periksa apakah email dan kata sandi valid
                 if (!email || !password) {
                     showMessage("Email dan kata sandi tidak boleh kosong.", "error");
                     return;
@@ -289,28 +314,7 @@
                 hideLoginModal();
             } catch (error) {
                 console.error("Login gagal:", error);
-                let errorMessage;
-                switch (error.code) {
-                    case 'auth/invalid-email':
-                        errorMessage = "Format email tidak valid.";
-                        break;
-                    case 'auth/user-disabled':
-                        errorMessage = "Akun ini telah dinonaktifkan.";
-                        break;
-                    case 'auth/user-not-found':
-                        errorMessage = "Tidak ada akun yang ditemukan dengan email ini.";
-                        break;
-                    case 'auth/wrong-password':
-                        errorMessage = "Kata sandi salah.";
-                        break;
-                    case 'auth/operation-not-allowed':
-                        errorMessage = "Login dengan Email/Kata Sandi tidak diizinkan. Ini bisa terjadi jika akun dibuat dengan Google atau metode lain.";
-                        break;
-                    default:
-                        errorMessage = `Login gagal: ${error.message}.`;
-                        break;
-                }
-                showMessage(errorMessage, "error");
+                handleAuthError(error, email);
             }
         };
 
@@ -330,6 +334,12 @@
                     showMessage("Email dan kata sandi tidak boleh kosong.", "error");
                     return;
                 }
+                const signInMethods = await fetchSignInMethodsForEmail(auth, email);
+                if (signInMethods.length > 0) {
+                     // If the email is already in use, inform the user
+                    showMessage("Email ini sudah digunakan. Silakan masuk atau gunakan email lain.", "error");
+                    return;
+                }
                 const userCredential = await createUserWithEmailAndPassword(auth, email, password);
                 const user = userCredential.user;
                 const userDocRef = doc(db, 'artifacts', appId, 'users', user.uid);
@@ -345,7 +355,7 @@
                 let errorMessage;
                 switch (error.code) {
                     case 'auth/email-already-in-use':
-                        errorMessage = "Email ini sudah digunakan.";
+                        errorMessage = "Email ini sudah digunakan. Silakan masuk.";
                         break;
                     case 'auth/invalid-email':
                         errorMessage = "Format email tidak valid.";
@@ -354,7 +364,8 @@
                         errorMessage = "Kata sandi terlalu lemah (minimal 6 karakter).";
                         break;
                     case 'auth/operation-not-allowed':
-                        errorMessage = "Pendaftaran dengan Email/Kata Sandi tidak diizinkan. Ini bisa terjadi jika akun sudah ada dengan metode lain.";
+                        // Fallback message for this specific error
+                        errorMessage = "Pendaftaran dengan Email/Kata Sandi tidak diizinkan. Coba lagi atau gunakan metode lain.";
                         break;
                     default:
                         errorMessage = `Registrasi gagal: ${error.message}.`;
