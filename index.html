@@ -380,7 +380,7 @@
                     accountsList.appendChild(accountElement);
                 });
                 
-                document.querySelectorAll('.delete-account-btn').forEach(btn => btn.addEventListener('click', async (e) => {
+                document.querySelectorAll('.delete-account-btn').forEach(btn => btn.addEventListener('click', (e) => {
                     const accountId = e.target.dataset.id;
                     const confirmationModal = document.createElement('div');
                     confirmationModal.className = 'modal-overlay fixed inset-0 z-50 flex items-center justify-center';
@@ -455,7 +455,7 @@
                     adsList.appendChild(adElement);
                 });
                 
-                document.querySelectorAll('.delete-ad-btn').forEach(btn => btn.addEventListener('click', async (e) => {
+                document.querySelectorAll('.delete-ad-btn').forEach(btn => btn.addEventListener('click', (e) => {
                     const adId = e.target.dataset.id;
                     const confirmationModal = document.createElement('div');
                     confirmationModal.className = 'modal-overlay fixed inset-0 z-50 flex items-center justify-center';
@@ -526,7 +526,7 @@
                     adminsList.appendChild(adminElement);
                 });
                 
-                document.querySelectorAll('.delete-admin-btn').forEach(btn => btn.addEventListener('click', async (e) => {
+                document.querySelectorAll('.delete-admin-btn').forEach(btn => btn.addEventListener('click', (e) => {
                     const adminId = e.target.dataset.id;
                     const confirmationModal = document.createElement('div');
                     confirmationModal.className = 'modal-overlay fixed inset-0 z-50 flex items-center justify-center';
@@ -862,9 +862,9 @@
                 
                 <!-- Category Tabs -->
                 <div class="flex justify-center space-x-4 mb-8">
-                    <button class="px-4 py-2 rounded-full bg-gray-700 hover:bg-yellow-500 text-white hover:text-gray-900 transition-colors" onclick="renderProducts()">Semua</button>
-                    <button class="px-4 py-2 rounded-full bg-gray-700 hover:bg-yellow-500 text-white hover:text-gray-900 transition-colors" onclick="renderProducts('Steam')">Steam</button>
-                    <button class="px-4 py-2 rounded-full bg-gray-700 hover:bg-yellow-500 text-white hover:text-gray-900 transition-colors" onclick="renderProducts('Roblox')">Roblox</button>
+                    <button class="px-4 py-2 rounded-full bg-gray-700 hover:bg-yellow-500 hover:text-gray-900 transition-colors" onclick="renderProducts()">Semua</button>
+                    <button class="px-4 py-2 rounded-full bg-gray-700 hover:bg-yellow-500 hover:text-gray-900 transition-colors" onclick="renderProducts('Steam')">Steam</button>
+                    <button class="px-4 py-2 rounded-full bg-gray-700 hover:bg-yellow-500 hover:text-gray-900 transition-colors" onclick="renderProducts('Roblox')">Roblox</button>
                 </div>
 
                 <!-- Product List -->
