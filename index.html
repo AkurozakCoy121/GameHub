@@ -3,976 +3,1028 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>KingzStore - Akun Steam & Roblox Murah & Terpercaya</title>
-    <!-- Tailwind CSS CDN untuk styling modern dan responsif -->
+    <title>KingzStore - Jual Akun Steam dan Roblox Terpercaya</title>
     <script src="https://cdn.tailwindcss.com"></script>
-    <!-- Font Awesome untuk ikon -->
-    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
-    <!-- Font 'Inter' dari Google Fonts -->
-    <link rel="preconnect" href="https://fonts.googleapis.com">
-    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
-    <style>
-        :root {
-            --primary-yellow: #FFD700;
-            --secondary-white: #FFFFFF;
-            --text-gray: #4A4A4A;
+    <script type="module">
+        import { initializeApp } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-app.js";
+        import { getAuth, signInAnonymously, signInWithCustomToken, signInWithEmailAndPassword, onAuthStateChanged, signOut, createUserWithEmailAndPassword } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-auth.js";
+        import { getFirestore, doc, getDoc, collection, getDocs, addDoc, updateDoc, deleteDoc, query, where, onSnapshot, setDoc } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-firestore.js";
+
+        // Firebase Configuration
+        const firebaseConfig = {
+            apiKey: "AIzaSyAlGXpZSyQab7riDteV5ppS3DXDJQHywKw",
+            authDomain: "modmanagerpro-248f5.firebaseapp.com",
+            projectId: "modmanagerpro-248f5",
+            storageBucket: "modmanagerpro-248f5.firebasestorage.app",
+            messagingSenderId: "594650288669",
+            appId: "1:594650288669:web:3074c3f2f0249bc6f1ecf4",
+            measurementId: "G-VLWZDSRS3W"
+        };
+        
+        // Global variables provided by the environment
+        const __initial_auth_token = ""; 
+        const __app_id = "modmanagerpro-248f5";
+        
+        // Initialize Firebase
+        const app = initializeApp(firebaseConfig);
+        const auth = getAuth(app);
+        const db = getFirestore(app);
+        
+        let userId;
+        let isAdminUser = false;
+
+        // --- UI and Firebase Functions ---
+        
+        // Function to show an info modal
+        function showInfoModal(message) {
+            const infoModal = document.getElementById('info-modal');
+            const infoMessage = document.getElementById('info-message');
+            infoMessage.innerHTML = message;
+            infoModal.style.display = 'flex';
         }
 
+        // Function to show/hide a modal
+        function showModal(id) {
+            document.getElementById(id).style.display = 'flex';
+        }
+        function hideModal(id) {
+            document.getElementById(id).style.display = 'none';
+        }
+
+        // Function to show a notification
+        function showNotification(message) {
+            const notif = document.getElementById('notification');
+            notif.textContent = message;
+            notif.classList.remove('hidden');
+            notif.classList.add('animate-slide-in');
+            setTimeout(() => {
+                notif.classList.remove('animate-slide-in');
+                notif.classList.add('animate-slide-out');
+                setTimeout(() => notif.classList.add('hidden'), 500);
+            }, 3000);
+        }
+
+        // Function to render products on the main page
+        async function renderProducts(category) {
+            const productList = document.getElementById('product-list');
+            productList.innerHTML = `<div class="col-span-1 md:col-span-2 lg:col-span-3 text-center py-8"><p class="text-gray-500 italic">Memuat produk...</p></div>`;
+            
+            const productsRef = collection(db, `artifacts/${__app_id}/products`);
+            const q = query(productsRef, where('category', '==', category));
+
+            try {
+                const querySnapshot = await getDocs(q);
+                if (querySnapshot.empty) {
+                    productList.innerHTML = `<p class="text-gray-500 italic text-center col-span-1 md:col-span-2 lg:col-span-3">Tidak ada produk di kategori ini.</p>`;
+                    return;
+                }
+
+                productList.innerHTML = '';
+                querySnapshot.forEach(doc => {
+                    const product = doc.data();
+                    const productElement = document.createElement('div');
+                    productElement.className = 'product-card';
+                    const priceDisplay = product.discount ? 
+                        `<p class="text-gray-400 line-through mr-2">${product.price}</p><p class="text-red-500 font-semibold">${product.discountedPrice}</p>` :
+                        `<p class="text-yellow-400 font-semibold">${product.price}</p>`;
+                    
+                    productElement.innerHTML = `
+                        <div class="relative w-full overflow-hidden rounded-xl">
+                            <img src="${product.imageUrl}" alt="${product.name}" class="w-full h-48 object-cover">
+                            <div class="absolute bottom-0 left-0 right-0 p-4 bg-gradient-to-t from-gray-900 via-transparent to-transparent">
+                                <h3 class="text-white text-lg font-bold">${product.name}</h3>
+                                <div class="flex items-center mt-1">${priceDisplay}</div>
+                            </div>
+                            ${product.discount ? `<span class="absolute top-2 right-2 bg-red-500 text-white text-xs font-bold px-2 py-1 rounded-full">- ${product.discount}%</span>` : ''}
+                        </div>
+                        <div class="p-4">
+                            <p class="text-sm text-gray-400 mb-2">ID Produk: ${doc.id}</p>
+                            <ul class="list-disc list-inside text-sm text-gray-600 mb-4">
+                                ${product.description.map(desc => `<li>${desc}</li>`).join('')}
+                            </ul>
+                            <button class="buy-button w-full btn btn-primary" data-product-id="${doc.id}">Pesan Sekarang</button>
+                        </div>
+                    `;
+                    productList.appendChild(productElement);
+                });
+
+                document.querySelectorAll('.buy-button').forEach(button => {
+                    button.addEventListener('click', (e) => showOrderModal(e.target.dataset.productId));
+                });
+
+            } catch (e) {
+                console.error("Error fetching products:", e);
+                productList.innerHTML = `<p class="text-red-500 text-center col-span-1 md:col-span-2 lg:col-span-3">Gagal memuat produk. Silakan coba lagi.</p>`;
+            }
+        }
+        
+        // Function to render ads
+        async function renderAds() {
+            const adBanner = document.getElementById('ad-banner');
+            adBanner.innerHTML = '';
+            const adsRef = collection(db, `artifacts/${__app_id}/ads`);
+            
+            try {
+                const querySnapshot = await getDocs(adsRef);
+                if (!querySnapshot.empty) {
+                    // Show the first ad or a random one
+                    const ad = querySnapshot.docs[0].data();
+                    adBanner.innerHTML = `<img src="${ad.imageUrl}" alt="${ad.description}" class="w-full rounded-xl shadow-md">`;
+                    adBanner.classList.remove('hidden');
+                }
+            } catch (e) {
+                console.error("Error fetching ads:", e);
+            }
+        }
+        
+        // Function to place an order
+        async function placeOrder(productId) {
+            const ordersRef = collection(db, `artifacts/${__app_id}/orders`);
+            const accountsRef = collection(db, `artifacts/${__app_id}/available_accounts`);
+            
+            try {
+                // Check for available account
+                const accountQuery = query(accountsRef, where('productId', '==', productId), where('is_available', '==', true));
+                const accountSnapshot = await getDocs(accountQuery);
+                
+                if (accountSnapshot.empty) {
+                    showInfoModal('Maaf, produk ini sementara habis. Silakan coba lagi nanti.');
+                    return;
+                }
+                
+                const accountDoc = accountSnapshot.docs[0];
+                const accountId = accountDoc.id;
+                const accountData = accountDoc.data();
+
+                // Get product details
+                const productDoc = await getDoc(doc(db, `artifacts/${__app_id}/products/${productId}`));
+                const product = productDoc.data();
+                
+                // Create a unique order ID
+                const orderId = 'ORD-' + Math.random().toString(36).substr(2, 9).toUpperCase();
+
+                // Add order to Firestore
+                await addDoc(ordersRef, {
+                    userId: userId,
+                    productId: productId,
+                    productName: product.name,
+                    price: product.discountedPrice || product.price,
+                    orderId: orderId,
+                    status: 'pending',
+                    accountId: accountId,
+                    createdAt: new Date()
+                });
+
+                // Mark the account as not available
+                await updateDoc(doc(accountsRef, accountId), { is_available: false });
+                
+                // Prepare and send to WhatsApp
+                const waNumber = '81944589876';
+                const message = `Halo KingzStore, saya ingin memesan akun ${product.name} (ID Pesanan: ${orderId}). Apakah akun ini masih tersedia?`;
+                window.location.href = `https://wa.me/${waNumber}?text=${encodeURIComponent(message)}`;
+
+            } catch (e) {
+                console.error("Error placing order:", e);
+                showInfoModal('Gagal membuat pesanan. Silakan coba lagi.');
+            }
+        }
+
+        // Function to show order confirmation modal
+        async function showOrderModal(productId) {
+            const modal = document.getElementById('order-modal');
+            const confirmBtn = document.getElementById('confirm-order-btn');
+            const cancelBtn = document.getElementById('cancel-order-btn');
+            
+            modal.style.display = 'flex';
+
+            confirmBtn.onclick = () => {
+                placeOrder(productId);
+                hideModal('order-modal');
+            };
+            cancelBtn.onclick = () => {
+                hideModal('order-modal');
+            };
+        }
+
+        // --- Admin Panel Functions ---
+
+        // Function to render products in admin panel
+        const renderAdminProducts = () => {
+            const productsList = document.getElementById('admin-products-list');
+            onSnapshot(collection(db, `artifacts/${__app_id}/products`), (snapshot) => {
+                productsList.innerHTML = '';
+                snapshot.forEach(doc => {
+                    const product = doc.data();
+                    const productElement = document.createElement('tr');
+                    productElement.innerHTML = `
+                        <td class="px-6 py-4 whitespace-nowrap">${product.name}</td>
+                        <td class="px-6 py-4 whitespace-nowrap">${product.price}</td>
+                        <td class="px-6 py-4 whitespace-nowrap">${product.discount || '0'}%</td>
+                        <td class="px-6 py-4 whitespace-nowrap text-right text-sm font-medium">
+                            <button class="text-red-600 hover:text-red-900 delete-product-btn" data-id="${doc.id}">Hapus</button>
+                        </td>
+                    `;
+                    productsList.appendChild(productElement);
+                });
+
+                document.querySelectorAll('.delete-product-btn').forEach(btn => btn.addEventListener('click', async (e) => {
+                    const productId = e.target.dataset.id;
+                    if (confirm('Apakah Anda yakin ingin menghapus produk ini?')) {
+                        try {
+                            await deleteDoc(doc(db, `artifacts/${__app_id}/products/${productId}`));
+                            showNotification('Produk berhasil dihapus!');
+                        } catch (error) {
+                            console.error("Error deleting product:", error);
+                            showNotification('Gagal menghapus produk.');
+                        }
+                    }
+                }));
+            });
+        };
+
+        // Function to add a new product
+        const handleAddProduct = async (event) => {
+            event.preventDefault();
+            const form = event.target;
+            const newProduct = {
+                name: form.name.value,
+                category: form.category.value,
+                price: form.price.value,
+                discount: form.discount.value ? parseInt(form.discount.value) : null,
+                discountedPrice: form.discount.value ? (parseInt(form.price.value.replace(/\D/g,'')) * (1 - parseInt(form.discount.value)/100)).toLocaleString('id-ID', {style: 'currency', currency: 'IDR'}) : null,
+                imageUrl: form.imageUrl.value,
+                description: form.description.value.split(',').map(item => item.trim())
+            };
+
+            try {
+                await addDoc(collection(db, `artifacts/${__app_id}/products`), newProduct);
+                showNotification('Produk berhasil ditambahkan!');
+                form.reset();
+            } catch (error) {
+                console.error("Error adding product:", error);
+                showNotification('Gagal menambahkan produk.');
+            }
+        };
+
+        // Function to render orders in admin panel
+        const renderAdminOrders = () => {
+            const ordersList = document.getElementById('admin-orders-list');
+            onSnapshot(collection(db, `artifacts/${__app_id}/orders`), (snapshot) => {
+                ordersList.innerHTML = '';
+                snapshot.forEach(doc => {
+                    const order = doc.data();
+                    const orderItem = document.createElement('tr');
+                    orderItem.innerHTML = `
+                        <td class="px-6 py-4 whitespace-nowrap">${order.orderId}</td>
+                        <td class="px-6 py-4 whitespace-nowrap">${order.productName}</td>
+                        <td class="px-6 py-4 whitespace-nowrap">${order.price}</td>
+                        <td class="px-6 py-4 whitespace-nowrap">${order.status}</td>
+                        <td class="px-6 py-4 whitespace-nowrap text-right text-sm font-medium">
+                            <button class="text-indigo-600 hover:text-indigo-900 mr-2 message-btn" data-id="${doc.id}">Lihat Pesan</button>
+                        </td>
+                    `;
+                    ordersList.appendChild(orderItem);
+                });
+                
+                document.querySelectorAll('.message-btn').forEach(btn => btn.addEventListener('click', async (e) => {
+                    const orderDocId = e.target.dataset.id;
+                    const orderDoc = await getDoc(doc(db, `artifacts/${__app_id}/orders/${orderDocId}`));
+                    const orderData = orderDoc.data();
+                    
+                    const accountDoc = await getDoc(doc(db, `artifacts/${__app_id}/available_accounts/${orderData.accountId}`));
+                    const accountData = accountDoc.data();
+                    
+                    const message = `ID Pesanan: ${orderData.orderId}\nProduk: ${orderData.productName}\n\nDetail Akun:\nUsername: ${accountData.username}\nPassword: ${accountData.password}`;
+                    showInfoModal(`
+                        <h4 class="font-bold mb-2">Pesan Untuk Pelanggan</h4>
+                        <p class="text-left whitespace-pre-wrap">${message}</p>
+                        <button onclick="navigator.clipboard.writeText('${message.replace(/\n/g, '\\n')}').then(() => showNotification('Pesan disalin!'))" class="btn btn-primary mt-4">Salin Pesan</button>
+                    `);
+                }));
+            });
+        };
+        
+        // Function to render accounts in admin panel
+        const renderAdminAccounts = () => {
+            const accountsList = document.getElementById('admin-accounts-list');
+            onSnapshot(collection(db, `artifacts/${__app_id}/available_accounts`), (snapshot) => {
+                accountsList.innerHTML = '';
+                snapshot.forEach(doc => {
+                    const account = doc.data();
+                    const accountElement = document.createElement('tr');
+                    accountElement.innerHTML = `
+                        <td class="px-6 py-4 whitespace-nowrap">${account.username}</td>
+                        <td class="px-6 py-4 whitespace-nowrap">${account.productId}</td>
+                        <td class="px-6 py-4 whitespace-nowrap">
+                            <span class="px-2 inline-flex text-xs leading-5 font-semibold rounded-full ${account.is_available ? 'bg-green-100 text-green-800' : 'bg-red-100 text-red-800'}">
+                                ${account.is_available ? 'Tersedia' : 'Terpakai'}
+                            </span>
+                        </td>
+                        <td class="px-6 py-4 whitespace-nowrap text-right text-sm font-medium">
+                            <button class="text-red-600 hover:text-red-900 delete-account-btn" data-id="${doc.id}">Hapus</button>
+                        </td>
+                    `;
+                    accountsList.appendChild(accountElement);
+                });
+                
+                document.querySelectorAll('.delete-account-btn').forEach(btn => btn.addEventListener('click', async (e) => {
+                    const accountId = e.target.dataset.id;
+                    if (confirm('Apakah Anda yakin ingin menghapus akun ini?')) {
+                        try {
+                            await deleteDoc(doc(db, `artifacts/${__app_id}/available_accounts/${accountId}`));
+                            showNotification('Akun berhasil dihapus!');
+                        } catch (error) {
+                            console.error("Error deleting account:", error);
+                            showNotification('Gagal menghapus akun.');
+                        }
+                    }
+                }));
+            });
+        };
+
+        // Function to add a new account
+        const handleAddAccount = async (event) => {
+            event.preventDefault();
+            const form = event.target;
+            const newAccount = {
+                productId: form.productId.value,
+                username: form.username.value,
+                password: form.password.value,
+                is_available: true
+            };
+
+            try {
+                await addDoc(collection(db, `artifacts/${__app_id}/available_accounts`), newAccount);
+                showNotification('Akun berhasil ditambahkan!');
+                form.reset();
+            } catch (error) {
+                console.error("Error adding account:", error);
+                showNotification('Gagal menambahkan akun.');
+            }
+        };
+
+        // Function to render ads in admin panel
+        const renderAdminAds = () => {
+            const adsList = document.getElementById('admin-ads-list');
+            onSnapshot(collection(db, `artifacts/${__app_id}/ads`), (snapshot) => {
+                adsList.innerHTML = '';
+                snapshot.forEach(doc => {
+                    const ad = doc.data();
+                    const adElement = document.createElement('tr');
+                    adElement.innerHTML = `
+                        <td class="px-6 py-4 whitespace-nowrap">${ad.description}</td>
+                        <td class="px-6 py-4 whitespace-nowrap">${ad.imageUrl.substring(0, 30)}...</td>
+                        <td class="px-6 py-4 whitespace-nowrap text-right text-sm font-medium">
+                            <button class="text-red-600 hover:text-red-900 delete-ad-btn" data-id="${doc.id}">Hapus</button>
+                        </td>
+                    `;
+                    adsList.appendChild(adElement);
+                });
+                
+                document.querySelectorAll('.delete-ad-btn').forEach(btn => btn.addEventListener('click', async (e) => {
+                    const adId = e.target.dataset.id;
+                    if (confirm('Apakah Anda yakin ingin menghapus iklan ini?')) {
+                        try {
+                            await deleteDoc(doc(db, `artifacts/${__app_id}/ads/${adId}`));
+                            showNotification('Iklan berhasil dihapus!');
+                        } catch (error) {
+                            console.error("Error deleting ad:", error);
+                            showNotification('Gagal menghapus iklan.');
+                        }
+                    }
+                }));
+            });
+        };
+
+        // Function to add a new ad
+        const handleAddAd = async (event) => {
+            event.preventDefault();
+            const form = event.target;
+            const newAd = {
+                imageUrl: form.imageUrl.value,
+                description: form.description.value
+            };
+            try {
+                await addDoc(collection(db, `artifacts/${__app_id}/ads`), newAd);
+                showNotification('Iklan berhasil ditambahkan!');
+                form.reset();
+            } catch (error) {
+                console.error("Error adding ad:", error);
+                showNotification('Gagal menambahkan iklan.');
+            }
+        };
+        
+        // Function to add a new admin
+        const handleAddAdmin = async (event) => {
+            event.preventDefault();
+            const form = event.target;
+            const email = form.adminEmail.value;
+            const password = form.adminPassword.value;
+            
+            try {
+                const currentUser = auth.currentUser;
+                const isAdmin = await checkIfAdmin(currentUser.uid);
+
+                if (isAdmin) {
+                    const userCredential = await createUserWithEmailAndPassword(auth, email, password);
+                    await setDoc(doc(db, `artifacts/${__app_id}/admins`, userCredential.user.uid), {
+                        email: email,
+                        addedBy: currentUser.uid,
+                        createdAt: new Date()
+                    });
+                    showNotification('Admin baru berhasil ditambahkan!');
+                    form.reset();
+                } else {
+                    showNotification('Anda tidak memiliki izin untuk menambahkan admin.');
+                }
+            } catch (error) {
+                console.error("Error adding admin:", error);
+                showNotification('Gagal menambahkan admin: ' + error.message);
+            }
+        };
+        
+        // Function to check if a user is an admin
+        const checkIfAdmin = async (uid) => {
+            if (!uid) return false;
+            const adminDoc = await getDoc(doc(db, `artifacts/${__app_id}/admins`, uid));
+            return adminDoc.exists();
+        };
+        
+        // Function to manage display between user and admin
+        function toggleAdminView(showAdmin) {
+            const userContent = document.getElementById('user-content');
+            const adminPanel = document.getElementById('admin-panel');
+            const toggleAdminBtn = document.getElementById('toggle-admin-panel-btn');
+
+            if (showAdmin) {
+                toggleAdminBtn.classList.remove('hidden');
+                userContent.classList.add('hidden');
+                adminPanel.classList.remove('hidden');
+            } else {
+                toggleAdminBtn.classList.add('hidden');
+                userContent.classList.remove('hidden');
+                adminPanel.classList.add('hidden');
+            }
+        }
+
+        // --- Event Listeners and Initial Setup ---
+        
+        // Mobile menu toggle
+        document.getElementById('mobile-menu-button').addEventListener('click', () => {
+            document.getElementById('mobile-menu').classList.toggle('hidden');
+        });
+
+        // Login & Logout buttons
+        document.getElementById('login-btn').addEventListener('click', () => showModal('login-modal'));
+        document.getElementById('logout-btn').addEventListener('click', () => signOut(auth));
+        
+        // Handle login form submission
+        document.getElementById('login-form').addEventListener('submit', async (event) => {
+            event.preventDefault();
+            const email = document.getElementById('login-email').value;
+            const password = document.getElementById('login-password').value;
+            const loginStatus = document.getElementById('login-status');
+            
+            loginStatus.textContent = "Logging in...";
+            
+            try {
+                await signInWithEmailAndPassword(auth, email, password);
+                loginStatus.textContent = "Login berhasil!";
+                hideModal('login-modal');
+            } catch (error) {
+                console.error("Login failed:", error);
+                loginStatus.textContent = `Login gagal: ${error.message}`;
+            }
+        });
+
+        // Close modal buttons
+        document.getElementById('close-login-modal').addEventListener('click', () => hideModal('login-modal'));
+        document.getElementById('close-info-modal').addEventListener('click', () => hideModal('info-modal'));
+        document.getElementById('cancel-order-btn').addEventListener('click', () => hideModal('order-modal'));
+        
+        // Admin panel tab handlers
+        document.querySelectorAll('.admin-tab-btn').forEach(button => {
+            button.addEventListener('click', (e) => {
+                document.querySelectorAll('.admin-tab-btn').forEach(btn => btn.classList.remove('border-b-2', 'border-yellow-500'));
+                e.target.classList.add('border-b-2', 'border-yellow-500');
+                document.querySelectorAll('.admin-tab-content').forEach(content => content.classList.add('hidden'));
+                document.getElementById(e.target.dataset.target).classList.remove('hidden');
+            });
+        });
+
+        // Handle forms in admin panel
+        document.getElementById('add-product-form').addEventListener('submit', handleAddProduct);
+        document.getElementById('add-account-form').addEventListener('submit', handleAddAccount);
+        document.getElementById('add-ad-form').addEventListener('submit', handleAddAd);
+        document.getElementById('add-admin-form').addEventListener('submit', handleAddAdmin);
+        
+        // Admin panel visibility toggle
+        document.getElementById('toggle-admin-panel-btn').addEventListener('click', () => {
+            const userContent = document.getElementById('user-content');
+            const adminPanel = document.getElementById('admin-panel');
+            userContent.classList.toggle('hidden');
+            adminPanel.classList.toggle('hidden');
+        });
+        
+        // Fix navigation issue: navigate to main sections from admin panel
+        document.querySelectorAll('header nav a').forEach(link => {
+            link.addEventListener('click', (e) => {
+                e.preventDefault();
+                document.getElementById('user-content').classList.remove('hidden');
+                document.getElementById('admin-panel').classList.add('hidden');
+                const targetId = e.target.getAttribute('href').substring(1);
+                const targetElement = document.getElementById(targetId);
+                if (targetElement) {
+                    targetElement.scrollIntoView({ behavior: 'smooth' });
+                }
+            });
+        });
+        
+        // Event listener for category buttons
+        document.querySelectorAll('.tab-btn').forEach(button => {
+            button.addEventListener('click', (e) => {
+                document.querySelectorAll('.tab-btn').forEach(btn => btn.classList.remove('active-tab'));
+                e.target.classList.add('active-tab');
+                renderProducts(e.target.dataset.category);
+            });
+        });
+        
+        // F10 Shortcut Listener for Admin Panel
+        document.addEventListener('keydown', (e) => {
+            if (e.key === 'F10' && isAdminUser) {
+                e.preventDefault();
+                const userContent = document.getElementById('user-content');
+                const adminPanel = document.getElementById('admin-panel');
+                if (userContent.classList.contains('hidden')) {
+                    // Currently in admin panel, toggle to user view
+                    toggleAdminView(false);
+                } else {
+                    // Currently in user view, toggle to admin panel
+                    toggleAdminView(true);
+                }
+            }
+        });
+        
+        // Global authentication state listener: The new, improved logic
+        onAuthStateChanged(auth, async (user) => {
+            const loginBtn = document.getElementById('login-btn');
+            const logoutBtn = document.getElementById('logout-btn');
+
+            if (user) {
+                loginBtn.classList.add('hidden');
+                logoutBtn.classList.remove('hidden');
+                userId = user.uid; // Set the global userId
+
+                isAdminUser = await checkIfAdmin(user.uid);
+                toggleAdminView(isAdminUser);
+                
+                if (isAdminUser) {
+                    renderAdminOrders();
+                    renderAdminProducts();
+                    renderAdminAccounts();
+                    renderAdminAds();
+                }
+            } else {
+                loginBtn.classList.remove('hidden');
+                logoutBtn.classList.add('hidden');
+                toggleAdminView(false); // Hide admin button
+                isAdminUser = false;
+            }
+            
+            // Hide the loading overlay and show the main content
+            document.getElementById('loading-overlay').style.display = 'none';
+            document.getElementById('main-content').classList.remove('hidden');
+            
+            // Initial rendering of products and ads, now done after auth check
+            renderAds();
+            renderProducts('steam');
+        });
+        
+        // Initial authentication check on window load
+        window.onload = async function() {
+            document.getElementById('loading-overlay').style.display = 'flex';
+            try {
+                if (__initial_auth_token) {
+                    await signInWithCustomToken(auth, __initial_auth_token);
+                } else {
+                    await signInAnonymously(auth);
+                }
+            } catch (error) {
+                console.error("Authentication failed:", error);
+                // Even if auth fails, we should still show the main site
+                document.getElementById('loading-overlay').style.display = 'none';
+                document.getElementById('main-content').classList.remove('hidden');
+                renderAds();
+                renderProducts('steam');
+            }
+        };
+
+    </script>
+    <style>
         body {
             font-family: 'Inter', sans-serif;
-            background-color: var(--secondary-white);
-            color: var(--text-gray);
-            overflow-x: hidden;
         }
-
         .container {
             max-width: 1200px;
-            margin: auto;
-            padding: 1rem;
+            margin: 0 auto;
+            padding: 1.5rem;
         }
-
-        .nav-link {
-            transition: color 0.3s;
+        .bg-pattern {
+            background-color: #FFFBEB;
+            background-image: radial-gradient(#FACC15 1px, transparent 1px);
+            background-size: 20px 20px;
         }
-
-        .nav-link:hover {
-            color: var(--primary-yellow);
-        }
-
-        .btn {
-            background-color: var(--primary-yellow);
-            color: var(--text-gray);
-            border-radius: 9999px;
-            font-weight: 600;
-            padding: 0.75rem 2rem;
-            transition: transform 0.2s, box-shadow 0.2s;
-            box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.1), 0 2px 4px -1px rgba(0, 0, 0, 0.06);
-        }
-
-        .btn:hover {
-            transform: translateY(-2px);
-            box-shadow: 0 10px 15px -3px rgba(0, 0, 0, 0.1), 0 4px 6px -2px rgba(0, 0, 0, 0.05);
-        }
-
-        .card {
-            background-color: #f7f7f7;
-            border-radius: 1.5rem;
-            box-shadow: 0 10px 20px rgba(0, 0, 0, 0.05);
-            transition: transform 0.3s;
-        }
-
-        .card:hover {
-            transform: scale(1.03);
-        }
-
-        .game-logo-container {
-            display: flex;
-            position: relative;
-            height: 100px;
+        .product-card {
+            background-color: #fff;
+            border-radius: 12px;
             overflow: hidden;
-            border-radius: 1rem;
-            padding: 0;
-            margin: 0;
+            box-shadow: 0 4px 12px rgba(0, 0, 0, 0.08);
+            transition: transform 0.2s, box-shadow 0.2s;
         }
-
-        .game-logo {
-            width: 100px;
-            height: 100px;
-            object-fit: cover;
-            position: absolute;
-            transition: transform 0.3s;
-            border-radius: 0.75rem;
+        .product-card:hover {
+            transform: translateY(-5px);
+            box-shadow: 0 8px 24px rgba(0, 0, 0, 0.12);
         }
-
-        .game-logo:nth-child(1) {
-            top: 0;
-            left: 0;
-            z-index: 30;
-            transform: rotate(-5deg);
+        .btn-primary {
+            background-color: #FACC15;
+            color: #1F2937;
+            font-weight: 600;
+            transition: background-color 0.2s;
         }
-
-        .game-logo:nth-child(2) {
-            top: 15px;
-            left: 40px;
-            z-index: 20;
-            transform: rotate(5deg);
+        .btn-primary:hover {
+            background-color: #EAB308;
         }
-
-        .game-logo:nth-child(3) {
-            top: 30px;
-            left: 80px;
-            z-index: 10;
-            transform: rotate(-3deg);
+        .nav-link {
+            transition: color 0.2s;
         }
-        
-        .modal {
-            background-color: rgba(0, 0, 0, 0.5);
-            backdrop-filter: blur(5px);
-            z-index: 100;
-            display: flex;
-            justify-content: center;
-            align-items: center;
+        .nav-link:hover {
+            color: #FACC15;
         }
-
+        .active-tab {
+            border-bottom: 3px solid #FACC15;
+            color: #FACC15;
+            font-weight: 600;
+        }
+        .modal-overlay {
+            background-color: rgba(0, 0, 0, 0.7);
+            transition: opacity 0.3s ease;
+        }
         .modal-content {
-            background-color: var(--secondary-white);
-            color: var(--text-gray);
-            border-radius: 1rem;
-            width: 90%;
-            max-width: 400px;
-            box-shadow: 0 20px 25px -5px rgba(0, 0, 0, 0.1), 0 10px 10px -5px rgba(0, 0, 0, 0.04);
-            animation: fadeIn 0.3s ease-in-out;
+            animation: fadeIn 0.3s ease;
         }
-
-        .loading-screen {
-            background-color: var(--primary-yellow);
-            color: var(--secondary-white);
-            z-index: 1000;
-            display: flex;
-            flex-direction: column;
-            justify-content: center;
-            align-items: center;
-        }
-
-        .dots span {
-            animation: pulse 1.5s infinite;
-        }
-
-        .dots span:nth-child(2) {
-            animation-delay: 0.5s;
-        }
-
-        .dots span:nth-child(3) {
-            animation-delay: 1s;
-        }
-
-        .maintenance-overlay {
-            z-index: 2000;
-            background-color: rgba(255, 255, 255, 0.95);
-            backdrop-filter: blur(10px);
-            display: none; /* Default to hidden */
-            flex-direction: column;
-            justify-content: center;
-            align-items: center;
-        }
-        
-        .admin-panel {
-            display: none; /* Hidden by default */
-        }
-        
         @keyframes fadeIn {
-            from { opacity: 0; transform: scale(0.95); }
+            from { opacity: 0; transform: scale(0.9); }
             to { opacity: 1; transform: scale(1); }
         }
-
-        @keyframes pulse {
-            0%, 100% { transform: scale(1); opacity: 1; }
-            50% { transform: scale(1.2); opacity: 0.7; }
+        .animate-slide-in {
+            animation: slide-in 0.5s forwards;
+        }
+        .animate-slide-out {
+            animation: slide-out 0.5s forwards;
+        }
+        @keyframes slide-in {
+            from { transform: translateX(100%); }
+            to { transform: translateX(0); }
+        }
+        @keyframes slide-out {
+            from { transform: translateX(0); }
+            to { transform: translateX(100%); }
         }
     </style>
 </head>
-<body class="bg-gray-100 min-h-screen">
-    <!-- Loading Screen -->
-    <div id="loading-screen" class="fixed inset-0 loading-screen">
-        <div class="text-2xl md:text-3xl font-bold mb-4">KingzStore</div>
-        <div class="text-sm text-center px-4">Chat <span class="font-bold">81944589876</span> jika memiliki masalah.</div>
-        <div class="dots mt-4">
-            <span class="inline-block w-3 h-3 bg-white rounded-full mx-1"></span>
-            <span class="inline-block w-3 h-3 bg-white rounded-full mx-1"></span>
-            <span class="inline-block w-3 h-3 bg-white rounded-full mx-1"></span>
-        </div>
-    </div>
-    
-    <!-- Maintenance Overlay -->
-    <div id="maintenance-overlay" class="fixed inset-0 maintenance-overlay">
-        <h1 class="text-4xl md:text-6xl font-extrabold text-red-500">MAINTENANCE</h1>
-        <p class="mt-4 text-xl text-center">Website sedang dalam perbaikan untuk layanan yang lebih baik.</p>
-        <p class="text-center">Silakan coba lagi nanti.</p>
+<body class="bg-gray-100 text-gray-800">
+
+    <!-- Loading Overlay -->
+    <div id="loading-overlay" class="fixed inset-0 bg-yellow-400 bg-opacity-90 z-50 flex flex-col items-center justify-center hidden">
+        <h1 class="text-4xl sm:text-5xl font-extrabold text-white animate-pulse">KingzStore</h1>
+        <p class="mt-4 text-white text-center px-4">Memuat data...</p>
     </div>
 
     <!-- Main Content -->
-    <div id="main-content" class="min-h-screen flex flex-col">
-        <!-- Header & Navbar -->
-        <header class="bg-white sticky top-0 z-50 shadow-md">
-            <nav class="container flex flex-wrap justify-between items-center py-4">
-                <a href="#home" class="flex items-center space-x-2">
-                    <img src="https://iili.io/Kdi9uHl.jpg" alt="KingzStore Logo" class="h-10 rounded-full">
-                    <span class="text-xl md:text-2xl font-bold text-gray-800">KingzStore</span>
+    <div id="main-content" class="hidden">
+        
+        <!-- Header -->
+        <header class="bg-white shadow-sm sticky top-0 z-40">
+            <div class="container flex justify-between items-center py-4">
+                <a href="#" class="flex items-center space-x-2">
+                    <img src="https://iili.io/Kdi9uHl.jpg" alt="KingzStore Logo" class="h-10 w-10 rounded-full">
+                    <h1 class="text-2xl font-bold text-gray-900">KingzStore</h1>
                 </a>
-                <div class="flex items-center space-x-4 md:hidden">
-                    <button id="login-btn-mobile" class="text-gray-600 font-medium hover:text-yellow-500">Masuk</button>
-                    <button id="menu-btn" class="text-gray-600 focus:outline-none">
-                        <i class="fas fa-bars fa-lg"></i>
+                <nav class="hidden md:flex items-center space-x-6">
+                    <button id="toggle-admin-panel-btn" class="nav-link text-gray-600 hover:text-yellow-500 hidden">Panel Admin</button>
+                    <a href="#products" class="nav-link text-gray-600 hover:text-yellow-500">Produk</a>
+                    <a href="#about" class="nav-link text-gray-600 hover:text-yellow-500">Tentang Kami</a>
+                    <a href="#contact" class="nav-link text-gray-600 hover:text-yellow-500">Kontak</a>
+                    <button id="login-btn" class="btn btn-secondary hidden">Login</button>
+                    <button id="logout-btn" class="btn btn-secondary hidden">Logout</button>
+                </nav>
+                <div class="md:hidden flex items-center space-x-2">
+                    <button id="mobile-menu-button" class="text-gray-600 focus:outline-none">
+                        <svg class="h-6 w-6" fill="none" stroke="currentColor" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 6h16M4 12h16m-7 6h7"></path>
+                        </svg>
                     </button>
                 </div>
-                <div id="nav-menu" class="hidden md:flex flex-grow justify-end md:space-x-8 mt-4 md:mt-0 w-full md:w-auto">
-                    <a href="#home" class="nav-link text-gray-600 font-medium hover:text-yellow-500">Beranda</a>
-                    <a href="#steam" class="nav-link text-gray-600 font-medium hover:text-yellow-500">Akun Steam</a>
-                    <a href="#roblox" class="nav-link text-gray-600 font-medium hover:text-yellow-500">Akun Roblox</a>
-                    <a href="#about" class="nav-link text-gray-600 font-medium hover:text-yellow-500">Tentang Kami</a>
-                    <a href="#contact" class="nav-link text-gray-600 font-medium hover:text-yellow-500">Kontak</a>
-                    <button id="login-btn-desktop" class="text-gray-600 font-medium hover:text-yellow-500">Masuk</button>
-                </div>
+            </div>
+            <!-- Mobile Menu -->
+            <nav id="mobile-menu" class="hidden md:hidden bg-white shadow-lg">
+                <button id="mobile-toggle-admin-panel-btn" class="block py-2 px-4 text-gray-800 hover:bg-gray-100 hidden">Panel Admin</button>
+                <a href="#products" class="block py-2 px-4 text-gray-800 hover:bg-gray-100">Produk</a>
+                <a href="#about" class="block py-2 px-4 text-gray-800 hover:bg-gray-100">Tentang Kami</a>
+                <a href="#contact" class="block py-2 px-4 text-gray-800 hover:bg-gray-100">Kontak</a>
             </nav>
         </header>
 
-        <!-- Sections -->
-        <main class="flex-grow">
-            <!-- Beranda Section -->
-            <section id="home" class="container py-16 text-center">
-                <h1 class="text-4xl md:text-6xl font-extrabold text-gray-800 leading-tight">
-                    Temukan Akun Gaming Impianmu di <span class="text-yellow-500">KingzStore</span>
-                </h1>
-                <p class="mt-4 text-lg md:text-xl text-gray-600 max-w-2xl mx-auto">
-                    Menyediakan akun Steam & Roblox berkualitas, terpercaya, dan dengan harga terbaik.
-                </p>
-                <div class="mt-8 flex flex-col sm:flex-row justify-center space-y-4 sm:space-y-0 sm:space-x-4">
-                    <a href="#steam" class="btn">Lihat Akun Steam</a>
-                    <a href="#roblox" class="btn bg-gray-200 hover:bg-gray-300 transform-none hover:scale-100">Lihat Akun Roblox</a>
+        <!-- User Content (Main site content) -->
+        <div id="user-content" class="min-h-screen">
+            <!-- Ad Banner -->
+            <section id="ad-banner" class="container py-8 hidden">
+                <!-- Ads will be dynamically inserted here -->
+            </section>
+
+            <!-- Hero Section -->
+            <section class="bg-pattern py-20 px-4 sm:py-24">
+                <div class="container text-center">
+                    <h2 class="text-4xl sm:text-5xl lg:text-6xl font-extrabold text-gray-900">
+                        Akun Steam & Roblox Murah dan Terpercaya
+                    </h2>
+                    <p class="mt-4 text-lg sm:text-xl text-gray-600">
+                        KingzStore menyediakan akun gaming berkualitas dengan harga bersahabat.
+                    </p>
+                    <a href="#products" class="mt-8 inline-block btn btn-primary text-lg animate-bounce">Lihat Produk</a>
                 </div>
             </section>
 
-            <!-- Steam Accounts Section -->
-            <section id="steam" class="container py-16">
-                <h2 class="text-3xl md:text-4xl font-bold text-center mb-12">Akun Steam Pilihan</h2>
-                <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-8" id="steam-accounts-container">
-                    <!-- Cards will be dynamically inserted here -->
-                </div>
-            </section>
-            
-            <!-- Roblox Accounts Section -->
-            <section id="roblox" class="container py-16">
-                <h2 class="text-3xl md:text-4xl font-bold text-center mb-12">Akun & Jasa Roblox</h2>
-                <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-8">
-                    <!-- Grow a Garden Account -->
-                    <div class="card p-6 flex flex-col items-center text-center">
-                        <i class="fas fa-seedling text-yellow-500 text-5xl mb-4"></i>
-                        <h3 class="text-2xl font-semibold text-gray-800">Akun Grow A Garden</h3>
-                        <p class="text-gray-600 mt-2 flex-grow">Akun-akun dengan progres di game Grow A Garden yang siap untuk dimainkan.</p>
-                        <p class="text-xl font-bold text-gray-800 mt-4">Mulai dari Rp 50.000</p>
-                        <button class="btn mt-4 w-full purchase-btn" data-product="Akun Grow A Garden">Pesan Sekarang</button>
+            <!-- Product Section -->
+            <section id="products" class="py-16 bg-white">
+                <div class="container">
+                    <h2 class="text-3xl sm:text-4xl font-bold text-center mb-10">Produk Kami</h2>
+                    
+                    <div class="flex justify-center mb-8 space-x-4">
+                        <button data-category="steam" class="tab-btn active-tab pb-2">Akun Steam</button>
+                        <button data-category="roblox" class="tab-btn pb-2">Akun Roblox</button>
                     </div>
 
-                    <!-- Joki Akun CDID -->
-                    <div class="card p-6 flex flex-col items-center text-center">
-                        <i class="fas fa-arrow-up-from-bracket text-yellow-500 text-5xl mb-4"></i>
-                        <h3 class="text-2xl font-semibold text-gray-800">Joki Akun CDID</h3>
-                        <p class="text-gray-600 mt-2 flex-grow">Jasa joki level CDID dari 1 hingga 100 juta dengan proses cepat dan aman.</p>
-                        <p class="text-xl font-bold text-gray-800 mt-4">Harga Tergantung Level</p>
-                        <button class="btn mt-4 w-full purchase-btn" data-product="Joki Akun CDID">Pesan Sekarang</button>
-                    </div>
-
-                    <!-- Joki Quest Kemerdekaan -->
-                    <div class="card p-6 flex flex-col items-center text-center">
-                        <img src="https://iili.io/KdiYZ5x.jpg" alt="Logo Kemerdekaan" class="w-24 h-24 object-cover rounded-full mb-4">
-                        <h3 class="text-2xl font-semibold text-gray-800">Joki Quest Kemerdekaan</h3>
-                        <p class="text-gray-600 mt-2 flex-grow">
-                            Selesaikan Quest Kemerdekaan Anda dengan cepat. Proses hanya <span class="font-bold">30 menit!</span>
-                        </p>
-                        <p class="text-xl font-bold text-gray-800 mt-4">Rp 10.000</p>
-                        <button class="btn mt-4 w-full purchase-btn" data-product="Joki Quest Kemerdekaan">Pesan Sekarang</button>
+                    <div id="product-list" class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-8">
+                        <!-- Products will be dynamically inserted here -->
                     </div>
                 </div>
             </section>
             
             <!-- About Us Section -->
-            <section id="about" class="container py-16">
-                <h2 class="text-3xl md:text-4xl font-bold text-center mb-8">Tentang Kami</h2>
-                <div class="bg-gray-200 rounded-2xl p-8 max-w-4xl mx-auto">
-                    <p class="text-lg text-gray-700 leading-relaxed text-center">
-                        KingzStore tidak hanya menyediakan akun Steam, tapi juga menyediakan akun Roblox berkualitas. Kami berkomitmen untuk memberikan pengalaman jual beli yang aman, cepat, dan terpercaya bagi para gamer. Dengan koleksi akun yang bervariasi dan layanan pelanggan yang responsif, kami siap membantu Anda menemukan akun gaming yang sesuai dengan kebutuhan Anda.
+            <section id="about" class="py-16 bg-gray-50">
+                <div class="container text-center">
+                    <h2 class="text-3xl sm:text-4xl font-bold mb-4">Tentang KingzStore</h2>
+                    <p class="text-gray-700 max-w-2xl mx-auto">
+                        KingzStore tidak hanya menyediakan akun Steam, tetapi juga menyediakan akun Roblox berkualitas. Kami berkomitmen untuk memberikan layanan terbaik, harga termurah, dan jaminan keamanan akun. Percayakan kebutuhan gaming Anda pada kami!
                     </p>
-                </div>
-            </section>
-            
-            <!-- Legal Section -->
-            <section id="legal" class="container py-16">
-                <div class="grid grid-cols-1 md:grid-cols-2 gap-8">
-                    <div class="bg-gray-200 rounded-2xl p-8">
-                        <h3 class="text-2xl font-semibold mb-4">Privacy Policy</h3>
-                        <p class="text-sm text-gray-700">Kami menghargai privasi Anda. Kebijakan Privasi ini menjelaskan bagaimana kami mengumpulkan, menggunakan, dan melindungi informasi pribadi Anda. Kami tidak akan pernah membagikan data Anda kepada pihak ketiga tanpa persetujuan Anda.</p>
-                    </div>
-                    <div class="bg-gray-200 rounded-2xl p-8">
-                        <h3 class="text-2xl font-semibold mb-4">Terms of Use</h3>
-                        <p class="text-sm text-gray-700">Dengan menggunakan website ini, Anda menyetujui Syarat & Ketentuan Penggunaan kami. Syarat ini mencakup aturan mengenai pembelian, penggunaan akun, dan tanggung jawab pengguna. Pastikan Anda membacanya dengan seksama.</p>
+                    <div class="flex justify-center items-center mt-6 space-x-4 text-lg text-gray-600">
+                        <a href="https://wa.me/81944589876" class="hover:text-yellow-500 transition-colors">
+                            <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="currentColor"><path d="M12.04 2C7.306 2 3.407 5.898 3.407 10.634c0 1.25.332 2.453.957 3.52l-.66 2.375 2.44-.645a8.683 8.683 0 0011.83 3.666 8.683 8.683 0 003.666-11.83C20.692 3.86 16.792 2 12.04 2zM17 14.28c-.16.29-.98.71-1.12.79-.14.08-.29.13-.53.07-.24-.05-1.01-.36-1.92-.95-.9-.59-1.5-1.33-1.68-1.57-.18-.24-.18-.23-.37-.49-.18-.24-.46-.62-.65-.89-.19-.27-.4-2.14.77-3.62 1.17-1.48 2.07-1.42 2.76-1.42.69 0 1.05-.08 1.48.58.42.66.42 1.55.24 1.83-.18.29-.62.71-.85.95-.23.24-.46.33-.69.45-.24.12-.49.19-.73.08s-.59-.22-1.04-.44c-.45-.22-.96-.54-1.38-1.01-.42-.47-.23-.49-.16-.36.07.13.43.51.64.91.22.4.43.89.59 1.11.16.22.27.36.45.54.18.18.36.33.54.49.18.16.36.22.45.27.16.08.33.09.49.07s.45-.16 1.01-.42c.56-.27.91-.45 1.1-.48.18-.04.33.07.45.24.11.16.11.95-.27 1.83z"></path></svg>
+                            <span>Whatsapp</span>
+                        </a>
+                        <a href="https://www.instagram.com/Kingzzstore" class="hover:text-yellow-500 transition-colors">
+                            <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="currentColor"><path d="M12 2.163c3.204 0 3.584.012 4.85.07c3.252.148 4.61 1.637 4.758 4.758.058 1.266.07 1.646.07 4.85s-.012 3.584-.07 4.85c-.148 3.252-1.637 4.61-4.758 4.758-1.266.058-1.646.07-4.85.07s-3.584-.012-4.85-.07c-3.252-.148-4.61-1.637-4.758-4.758-.058-1.266-.07-1.646-.07-4.85s.012-3.584.07-4.85c.148-3.252 1.637 4.61 4.758 4.758 1.266-.058 1.646-.07 4.85-.07zm0-2.163c-3.259 0-3.66.014-4.94.072-4.148.19-6.393 2.434-6.582 6.582-.058 1.28-.072 1.681-.072 4.94s.014 3.66.072 4.94c.19 4.148 2.434 6.393 6.582 6.582 1.28.058 1.681.072 4.94.072s3.66-.014 4.94-.072c4.148-.19 6.393-2.434 6.582-6.582.058-1.28.072-1.681.072-4.94s-.014-3.66-.072-4.94c-.19-4.148-2.434-6.393-6.582-6.582-1.28-.058-1.681-.072-4.94-.072zm0 5.862c-3.41 0-6.182 2.772-6.182 6.182s2.772 6.182 6.182 6.182 6.182-2.772 6.182-6.182-2.772-6.182-6.182-6.182zm0 10.163c-2.208 0-3.98-1.772-3.98-3.98s1.772-3.98 3.98-3.98 3.98 1.772 3.98 3.98-1.772 3.98-3.98 3.98zm6.54-11.458c0 .666-.541 1.207-1.207 1.207s-1.207-.541-1.207-1.207.541-1.207 1.207-1.207 1.207.541 1.207 1.207z"></path></svg>
+                            <span>@Kingzzstore</span>
+                        </a>
                     </div>
                 </div>
             </section>
-            
-            <!-- Contact Section -->
-            <section id="contact" class="container py-16 text-center">
-                <h2 class="text-3xl md:text-4xl font-bold mb-8">Hubungi Kami</h2>
-                <div class="space-y-4 text-lg">
-                    <p class="text-gray-700">
-                        Untuk pembelian akun dan pertanyaan, silakan hubungi kami via WhatsApp:<br>
-                        <a href="https://wa.me/6281944589876" class="text-yellow-500 font-bold hover:underline">81944589876</a>
-                    </p>
-                    <p class="text-gray-700">
-                        Ikuti kami di media sosial untuk update terbaru:<br>
-                        <a href="https://instagram.com/Kingzzstore" class="text-yellow-500 font-bold hover:underline">@Kingzzstore</a>
-                    </p>
-                </div>
-            </section>
-        </main>
+        </div>
 
-        <!-- Footer -->
-        <footer class="bg-gray-800 text-white py-8">
-            <div class="container text-center text-sm text-gray-400">
-                &copy; 2024 KingzStore. All Rights Reserved.
-            </div>
-        </footer>
-    </div>
-    
-    <!-- Admin Panel -->
-    <div id="admin-panel" class="min-h-screen p-8 bg-gray-100 hidden">
-        <div class="flex justify-between items-center mb-8">
-            <h1 class="text-3xl font-bold">KingzStore Admin Panel</h1>
-            <button id="logout-btn" class="btn text-sm">Logout</button>
-        </div>
-        
-        <!-- Tab Navigation -->
-        <div class="border-b border-gray-300 mb-4">
-            <nav class="flex space-x-4">
-                <button class="tab-btn py-2 px-4 font-semibold text-gray-600 border-b-2 border-transparent transition duration-300 ease-in-out hover:border-yellow-500 active-tab" data-tab="orders">Pesanan</button>
-                <button class="tab-btn py-2 px-4 font-semibold text-gray-600 border-b-2 border-transparent transition duration-300 ease-in-out hover:border-yellow-500" data-tab="products">Produk</button>
-                <button class="tab-btn py-2 px-4 font-semibold text-gray-600 border-b-2 border-transparent transition duration-300 ease-in-out hover:border-yellow-500" data-tab="users">Pengguna</button>
-                <button class="tab-btn py-2 px-4 font-semibold text-gray-600 border-b-2 border-transparent transition duration-300 ease-in-out hover:border-yellow-500" data-tab="ads">Iklan</button>
-                <button class="tab-btn py-2 px-4 font-semibold text-gray-600 border-b-2 border-transparent transition duration-300 ease-in-out hover:border-yellow-500" data-tab="maintenance">Maintenance</button>
-            </nav>
-        </div>
-        
-        <!-- Tab Content -->
-        <div id="tab-content">
-            <!-- Orders Tab -->
-            <div id="orders-tab" class="tab-page">
-                <div class="bg-white p-6 rounded-lg shadow">
-                    <h2 class="text-2xl font-bold mb-4">Daftar Pesanan</h2>
-                    <div id="orders-list">
-                        <!-- Orders will be loaded here -->
-                        <p class="text-center text-gray-500">Memuat pesanan...</p>
+        <!-- Admin Panel Section -->
+        <div id="admin-panel" class="min-h-screen hidden bg-gray-100 py-10">
+            <div class="container">
+                <h2 class="text-3xl font-bold mb-6">Panel Admin</h2>
+                <div class="bg-white p-6 rounded-lg shadow-md mb-6">
+                    <div class="flex space-x-4 mb-6">
+                        <button class="admin-tab-btn border-b-2 border-yellow-500 py-2" data-target="orders-tab">Pesanan</button>
+                        <button class="admin-tab-btn py-2" data-target="products-tab">Produk</button>
+                        <button class="admin-tab-btn py-2" data-target="accounts-tab">Akun</button>
+                        <button class="admin-tab-btn py-2" data-target="ads-tab">Iklan</button>
+                        <button class="admin-tab-btn py-2" data-target="admins-tab">Admin</button>
                     </div>
-                </div>
-            </div>
-            
-            <!-- Products Tab -->
-            <div id="products-tab" class="tab-page hidden">
-                <div class="bg-white p-6 rounded-lg shadow">
-                    <h2 class="text-2xl font-bold mb-4">Tambah Produk/Akun</h2>
-                    <form id="add-product-form" class="space-y-4">
-                        <input type="text" id="product-name" placeholder="Nama Produk" class="w-full p-2 border rounded">
-                        <input type="number" id="product-price" placeholder="Harga" class="w-full p-2 border rounded">
-                        <textarea id="product-description" placeholder="Deskripsi" class="w-full p-2 border rounded h-24"></textarea>
-                        <select id="product-category" class="w-full p-2 border rounded">
-                            <option value="Steam">Steam</option>
-                            <option value="Roblox">Roblox</option>
-                        </select>
-                        <button type="submit" class="btn">Tambah Produk</button>
-                    </form>
-                </div>
-            </div>
-            
-            <!-- Users Tab -->
-            <div id="users-tab" class="tab-page hidden">
-                <div class="bg-white p-6 rounded-lg shadow">
-                    <h2 class="text-2xl font-bold mb-4">Kelola Pengguna</h2>
-                     <!-- Add New User Form -->
-                     <div class="bg-gray-100 p-4 rounded-lg mb-6">
-                        <h3 class="text-xl font-semibold mb-2">Tambah Pengguna Baru</h3>
-                        <form id="add-user-form" class="space-y-4">
-                            <input type="email" id="new-user-email" placeholder="Email Pengguna" class="w-full p-2 border rounded" required>
-                            <input type="password" id="new-user-password" placeholder="Password (min. 6 karakter)" class="w-full p-2 border rounded" required>
-                            <select id="new-user-role" class="w-full p-2 border rounded">
-                                <option value="user">Pengguna Biasa</option>
-                                <option value="admin">Admin</option>
-                            </select>
-                            <button type="submit" class="btn w-full">Tambah Pengguna</button>
+
+                    <!-- Orders Tab -->
+                    <div id="orders-tab" class="admin-tab-content">
+                        <h3 class="text-2xl font-semibold mb-4">Daftar Pesanan</h3>
+                        <div class="overflow-x-auto">
+                            <table class="min-w-full divide-y divide-gray-200">
+                                <thead class="bg-gray-50">
+                                    <tr>
+                                        <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">ID Pesanan</th>
+                                        <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Produk</th>
+                                        <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Harga</th>
+                                        <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Status</th>
+                                        <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Aksi</th>
+                                    </tr>
+                                </thead>
+                                <tbody id="admin-orders-list" class="bg-white divide-y divide-gray-200">
+                                    <!-- Orders will be dynamically inserted here -->
+                                </tbody>
+                            </table>
+                        </div>
+                    </div>
+
+                    <!-- Products Tab -->
+                    <div id="products-tab" class="admin-tab-content hidden">
+                        <h3 class="text-2xl font-semibold mb-4">Tambah Produk Baru</h3>
+                        <form id="add-product-form" class="space-y-4">
+                            <div>
+                                <label for="name" class="block text-sm font-medium text-gray-700">Nama Produk</label>
+                                <input type="text" id="name" name="name" class="mt-1 block w-full rounded-md border-gray-300 shadow-sm" required>
+                            </div>
+                            <div>
+                                <label for="category" class="block text-sm font-medium text-gray-700">Kategori</label>
+                                <select id="category" name="category" class="mt-1 block w-full rounded-md border-gray-300 shadow-sm" required>
+                                    <option value="steam">Steam</option>
+                                    <option value="roblox">Roblox</option>
+                                </select>
+                            </div>
+                            <div>
+                                <label for="price" class="block text-sm font-medium text-gray-700">Harga (contoh: Rp50.000)</label>
+                                <input type="text" id="price" name="price" class="mt-1 block w-full rounded-md border-gray-300 shadow-sm" required>
+                            </div>
+                            <div>
+                                <label for="discount" class="block text-sm font-medium text-gray-700">Diskon (%)</label>
+                                <input type="number" id="discount" name="discount" class="mt-1 block w-full rounded-md border-gray-300 shadow-sm">
+                            </div>
+                            <div>
+                                <label for="imageUrl" class="block text-sm font-medium text-gray-700">URL Gambar</label>
+                                <input type="url" id="imageUrl" name="imageUrl" class="mt-1 block w-full rounded-md border-gray-300 shadow-sm" required>
+                            </div>
+                            <div>
+                                <label for="description" class="block text-sm font-medium text-gray-700">Deskripsi (Pisahkan dengan koma)</label>
+                                <input type="text" id="description" name="description" class="mt-1 block w-full rounded-md border-gray-300 shadow-sm" required>
+                            </div>
+                            <button type="submit" class="btn btn-primary">Tambah Produk</button>
+                        </form>
+                        <h3 class="text-2xl font-semibold mt-8 mb-4">Daftar Produk</h3>
+                        <div class="overflow-x-auto">
+                            <table class="min-w-full divide-y divide-gray-200">
+                                <thead class="bg-gray-50">
+                                    <tr>
+                                        <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Nama</th>
+                                        <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Harga</th>
+                                        <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Diskon</th>
+                                        <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Aksi</th>
+                                    </tr>
+                                </thead>
+                                <tbody id="admin-products-list" class="bg-white divide-y divide-gray-200">
+                                    <!-- Product list will be dynamically inserted here -->
+                                </tbody>
+                            </table>
+                        </div>
+                    </div>
+
+                    <!-- Accounts Tab -->
+                    <div id="accounts-tab" class="admin-tab-content hidden">
+                        <h3 class="text-2xl font-semibold mb-4">Tambah Akun Tersedia</h3>
+                        <form id="add-account-form" class="space-y-4">
+                            <div>
+                                <label for="account-productId" class="block text-sm font-medium text-gray-700">ID Produk</label>
+                                <input type="text" id="account-productId" name="productId" class="mt-1 block w-full rounded-md border-gray-300 shadow-sm" placeholder="ID dari produk terkait" required>
+                            </div>
+                            <div>
+                                <label for="username" class="block text-sm font-medium text-gray-700">Username</label>
+                                <input type="text" id="username" name="username" class="mt-1 block w-full rounded-md border-gray-300 shadow-sm" required>
+                            </div>
+                            <div>
+                                <label for="password" class="block text-sm font-medium text-gray-700">Password</label>
+                                <input type="text" id="password" name="password" class="mt-1 block w-full rounded-md border-gray-300 shadow-sm" required>
+                            </div>
+                            <button type="submit" class="btn btn-primary">Tambah Akun</button>
+                        </form>
+                        <h3 class="text-2xl font-semibold mt-8 mb-4">Daftar Akun Tersedia</h3>
+                        <div class="overflow-x-auto">
+                            <table class="min-w-full divide-y divide-gray-200">
+                                <thead class="bg-gray-50">
+                                    <tr>
+                                        <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Username</th>
+                                        <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">ID Produk</th>
+                                        <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Status</th>
+                                        <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Aksi</th>
+                                    </tr>
+                                </thead>
+                                <tbody id="admin-accounts-list" class="bg-white divide-y divide-gray-200">
+                                    <!-- Accounts list will be dynamically inserted here -->
+                                </tbody>
+                            </table>
+                        </div>
+                    </div>
+
+                    <!-- Ads Tab -->
+                    <div id="ads-tab" class="admin-tab-content hidden">
+                        <h3 class="text-2xl font-semibold mb-4">Tambah Iklan Baru</h3>
+                        <form id="add-ad-form" class="space-y-4">
+                            <div>
+                                <label for="ad-imageUrl" class="block text-sm font-medium text-gray-700">URL Gambar Iklan</label>
+                                <input type="url" id="ad-imageUrl" name="imageUrl" class="mt-1 block w-full rounded-md border-gray-300 shadow-sm" required>
+                            </div>
+                            <div>
+                                <label for="ad-description" class="block text-sm font-medium text-gray-700">Deskripsi Iklan</label>
+                                <input type="text" id="ad-description" name="description" class="mt-1 block w-full rounded-md border-gray-300 shadow-sm" required>
+                            </div>
+                            <button type="submit" class="btn btn-primary">Tambah Iklan</button>
+                        </form>
+                        <h3 class="text-2xl font-semibold mt-8 mb-4">Daftar Iklan</h3>
+                        <div class="overflow-x-auto">
+                            <table class="min-w-full divide-y divide-gray-200">
+                                <thead class="bg-gray-50">
+                                    <tr>
+                                        <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Deskripsi</th>
+                                        <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">URL Gambar</th>
+                                        <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Aksi</th>
+                                    </tr>
+                                </thead>
+                                <tbody id="admin-ads-list" class="bg-white divide-y divide-gray-200">
+                                    <!-- Ads list will be dynamically inserted here -->
+                                </tbody>
+                            </table>
+                        </div>
+                    </div>
+
+                    <!-- Admins Tab -->
+                    <div id="admins-tab" class="admin-tab-content hidden">
+                        <h3 class="text-2xl font-semibold mb-4">Tambah Admin Baru</h3>
+                        <p class="text-sm text-gray-500 mb-4">Fitur ini hanya dapat digunakan oleh admin utama.</p>
+                        <form id="add-admin-form" class="space-y-4">
+                            <div>
+                                <label for="adminEmail" class="block text-sm font-medium text-gray-700">Email Admin</label>
+                                <input type="email" id="adminEmail" name="adminEmail" class="mt-1 block w-full rounded-md border-gray-300 shadow-sm" required>
+                            </div>
+                            <div>
+                                <label for="adminPassword" class="block text-sm font-medium text-gray-700">Password Admin</label>
+                                <input type="password" id="adminPassword" name="adminPassword" class="mt-1 block w-full rounded-md border-gray-300 shadow-sm" required>
+                            </div>
+                            <button type="submit" class="btn btn-primary">Tambah Admin</button>
                         </form>
                     </div>
-                    <div id="users-list">
-                         <p class="text-center text-gray-500">Memuat data pengguna...</p>
-                    </div>
                 </div>
             </div>
+        </div>
 
-            <!-- Ads Tab -->
-            <div id="ads-tab" class="tab-page hidden">
-                <div class="bg-white p-6 rounded-lg shadow">
-                    <h2 class="text-2xl font-bold mb-4">Kelola Iklan</h2>
-                    <form id="add-ad-form" class="space-y-4">
-                        <input type="text" id="ad-text" placeholder="Teks Iklan" class="w-full p-2 border rounded">
-                        <button type="submit" class="btn">Pasang Iklan</button>
-                    </form>
-                    <div class="mt-4" id="ads-list">
-                        <h3 class="text-xl font-semibold mb-2">Iklan Aktif</h3>
-                        <!-- Ads will be loaded here -->
+        <!-- Notification Pop-up -->
+        <div id="notification" class="fixed bottom-4 right-4 bg-gray-900 text-white px-6 py-3 rounded-lg shadow-xl hidden">
+            <!-- Notification message will be inserted here -->
+        </div>
+
+        <!-- Modals -->
+        <!-- Login Modal -->
+        <div id="login-modal" class="modal-overlay fixed inset-0 z-50 flex items-center justify-center hidden">
+            <div class="modal-content bg-white p-8 rounded-xl shadow-2xl max-w-sm w-full">
+                <h3 class="text-xl font-bold text-gray-900 mb-4 text-center">Login</h3>
+                <form id="login-form">
+                    <div class="mb-4">
+                        <label for="login-email" class="block text-gray-700">Email</label>
+                        <input type="email" id="login-email" class="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-yellow-500 focus:ring focus:ring-yellow-200 focus:ring-opacity-50" required>
                     </div>
+                    <div class="mb-6">
+                        <label for="login-password" class="block text-gray-700">Password</label>
+                        <input type="password" id="login-password" class="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-yellow-500 focus:ring focus:ring-yellow-200 focus:ring-opacity-50" required>
+                    </div>
+                    <button type="submit" class="w-full btn btn-primary">Login</button>
+                    <p id="login-status" class="mt-4 text-center text-sm text-red-500"></p>
+                </form>
+                <div class="mt-4 text-center">
+                    <button id="close-login-modal" class="text-gray-500 hover:text-gray-700">Tutup</button>
                 </div>
             </div>
+        </div>
 
-            <!-- Maintenance Tab -->
-            <div id="maintenance-tab" class="tab-page hidden">
-                <div class="bg-white p-6 rounded-lg shadow">
-                    <h2 class="text-2xl font-bold mb-4">Mode Maintenance</h2>
-                    <p id="maintenance-status" class="mb-4">Status: <span class="font-bold text-green-500">Normal</span></p>
-                    <button id="toggle-maintenance-btn" class="btn">Aktifkan Maintenance</button>
+        <!-- Order Confirmation Modal -->
+        <div id="order-modal" class="modal-overlay fixed inset-0 z-50 flex items-center justify-center hidden">
+            <div class="modal-content bg-white p-8 rounded-xl shadow-2xl text-center max-w-sm w-full">
+                <h3 class="text-xl font-bold text-gray-900 mb-4">Yakin pesan sekarang?</h3>
+                <p class="text-gray-600 mb-6">Anda akan diarahkan ke WhatsApp untuk menyelesaikan pembelian.</p>
+                <div class="flex justify-center space-x-4">
+                    <button id="cancel-order-btn" class="btn btn-secondary">Batal</button>
+                    <button id="confirm-order-btn" class="btn btn-primary">Ya, Pesan Sekarang</button>
                 </div>
             </div>
-
         </div>
-    </div>
 
-    <!-- Modals -->
-    <!-- Purchase Confirmation Modal -->
-    <div id="purchase-modal" class="modal fixed inset-0 hidden">
-        <div class="modal-content p-6 text-center">
-            <h3 class="text-2xl font-semibold mb-4">Yakin Pesan Sekarang?</h3>
-            <p id="order-id-display" class="mb-4 text-lg font-bold text-yellow-500"></p>
-            <p class="text-sm text-gray-500 mb-6">Nomor pesanan ini memudahkan admin untuk melacak pesanan Anda.</p>
-            <div class="flex justify-center space-x-4">
-                <button id="confirm-purchase-btn" class="btn bg-yellow-500 hover:bg-yellow-600">Ya, Pesan!</button>
-                <button id="cancel-purchase-btn" class="btn bg-gray-200 hover:bg-gray-300">Batal</button>
+        <!-- Info Modal -->
+        <div id="info-modal" class="modal-overlay fixed inset-0 z-50 flex items-center justify-center hidden">
+            <div class="modal-content bg-white p-8 rounded-xl shadow-2xl text-center max-w-sm w-full">
+                <h3 class="text-xl font-bold text-gray-900 mb-4">Informasi</h3>
+                <p id="info-message" class="text-gray-600 mb-6"></p>
+                <button id="close-info-modal" class="btn btn-primary">Tutup</button>
             </div>
         </div>
-    </div>
-    
-    <!-- Login/Register Modal -->
-    <div id="auth-modal" class="modal fixed inset-0 hidden">
-        <div class="modal-content p-6 text-center">
-            <h3 id="auth-title" class="text-2xl font-semibold mb-4">Masuk</h3>
-            <form id="auth-form" class="space-y-4">
-                <input type="email" id="auth-email" placeholder="Email" class="w-full p-2 border rounded" required>
-                <input type="password" id="auth-password" placeholder="Password" class="w-full p-2 border rounded" required>
-                <button type="submit" id="auth-submit-btn" class="btn w-full">Masuk</button>
-            </form>
-            <div class="mt-4 text-sm">
-                <p id="auth-toggle-text">Belum punya akun? <button id="auth-toggle-btn" class="text-yellow-500 hover:underline">Daftar sekarang</button></p>
+        
+        <!-- Footer -->
+        <footer class="bg-gray-900 text-gray-400 py-8">
+            <div class="container text-center">
+                <p>&copy; 2024 KingzStore. Semua hak dilindungi.</p>
+                <div class="mt-4 flex justify-center space-x-4">
+                    <a href="#" class="hover:text-yellow-500">Kebijakan Privasi</a>
+                    <span class="text-gray-600">|</span>
+                    <a href="#" class="hover:text-yellow-500">Ketentuan Penggunaan</a>
+                </div>
             </div>
-        </div>
+        </footer>
+        
     </div>
-    
-    <!-- Firebase JS SDKs (CDN) -->
-    <script type="module">
-        import { initializeApp } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-app.js";
-        import { getAuth, signInWithCustomToken, signInWithEmailAndPassword, createUserWithEmailAndPassword, onAuthStateChanged, signOut } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-auth.js";
-        import { getFirestore, doc, getDoc, setDoc, collection, addDoc, onSnapshot, updateDoc, deleteDoc, query, where, getDocs } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-firestore.js";
-
-        // Variabel global yang disediakan oleh lingkungan
-        const appId = typeof __app_id !== 'undefined' ? __app_id : 'default-app-id';
-        const firebaseConfig = JSON.parse(typeof __firebase_config !== 'undefined' ? __firebase_config : '{}');
-        const initialAuthToken = typeof __initial_auth_token !== 'undefined' ? __initial_auth_token : null;
-
-        let db, auth;
-        let purchaseData = {};
-
-        // Inisialisasi Firebase
-        function initializeFirebase() {
-            try {
-                const app = initializeApp(firebaseConfig);
-                auth = getAuth(app);
-                db = getFirestore(app);
-                console.log("Firebase initialized.");
-                return true;
-            } catch (error) {
-                console.error("Error initializing Firebase:", error);
-                return false;
-            }
-        }
-
-        // Penanganan Otentikasi
-        async function handleAuthentication() {
-            const firebaseInitialized = initializeFirebase();
-            if (!firebaseInitialized) return;
-            
-            // Perbaiki: Tambahkan try/catch untuk menangani error signInWithCustomToken
-            if (initialAuthToken) {
-                try {
-                    await signInWithCustomToken(auth, initialAuthToken);
-                    console.log("Signed in with custom token.");
-                } catch (error) {
-                    console.error("Error signing in with custom token:", error);
-                    // Jika token gagal, biarkan user tetap di halaman utama
-                    // atau tawarkan opsi untuk login manual
-                }
-            } else {
-                 console.warn("Initial auth token not available. Proceeding without automatic login.");
-            }
-            
-            // Listener untuk state otentikasi
-            onAuthStateChanged(auth, async (user) => {
-                await checkMaintenanceStatus();
-                if (user) {
-                    console.log("User is signed in with UID:", user.uid);
-                    await checkUserRole(user.uid);
-                    loadData();
-                } else {
-                    console.log("User is signed out or not authenticated.");
-                    document.getElementById('main-content').classList.remove('hidden');
-                    document.getElementById('admin-panel').classList.add('hidden');
-                    loadData();
-                }
-            });
-        }
-        
-        async function checkUserRole(uid) {
-            const userProfileRef = doc(db, `artifacts/${appId}/users/${uid}/userData/profile`);
-            try {
-                const docSnap = await getDoc(userProfileRef);
-                const isAdmin = docSnap.exists() && docSnap.data().isAdmin;
-                if (isAdmin) {
-                    console.log("User is admin. Showing admin panel.");
-                    document.getElementById('main-content').classList.add('hidden');
-                    document.getElementById('admin-panel').classList.remove('hidden');
-                    setupAdminListeners();
-                    loadAdminData(uid);
-                } else {
-                    console.log("User is not admin. Showing main content.");
-                    document.getElementById('main-content').classList.remove('hidden');
-                    document.getElementById('admin-panel').classList.add('hidden');
-                }
-            } catch (error) {
-                console.error("Error checking user role:", error);
-            }
-        }
-
-        async function checkMaintenanceStatus() {
-            const docRef = doc(db, `artifacts/${appId}/public/data/app_status`, "maintenance");
-            try {
-                const docSnap = await getDoc(docRef);
-                const isMaintenance = docSnap.exists() && docSnap.data().isMaintenance;
-                if (isMaintenance) {
-                    document.getElementById('main-content').classList.add('hidden');
-                    document.getElementById('maintenance-overlay').style.display = 'flex';
-                } else {
-                    document.getElementById('main-content').classList.remove('hidden');
-                    document.getElementById('maintenance-overlay').style.display = 'none';
-                }
-            } catch (error) {
-                console.error("Error checking maintenance status:", error);
-            }
-        }
-
-        function loadData() {
-            renderSteamAccounts();
-            setupListeners();
-        }
-
-        // Data akun Steam statis
-        const steamAccounts = [
-            {
-                id: 'acc1',
-                name: 'Akun Gaming Profesional',
-                price: 150000,
-                games: [
-                    { name: 'GTA V', logo: 'https://placehold.co/100x100/A0A0A0/ffffff?text=GTA+V' },
-                    { name: 'PEAK', logo: 'https://placehold.co/100x100/E8E8E8/4A4A4A?text=PEAK' },
-                    { name: 'SCHEDULE 1', logo: 'https://placehold.co/100x100/C0C0C0/ffffff?text=SCHED+1' }
-                ]
-            },
-            {
-                id: 'acc2',
-                name: 'Koleksi Kota',
-                price: 120000,
-                games: [
-                    { name: 'SimCity 5', logo: 'https://placehold.co/100x100/A0A0A0/ffffff?text=SimCity+5' },
-                    { name: 'Cities Skylines', logo: 'https://placehold.co/100x100/E8E8E8/4A4A4A?text=Cities+SK' }
-                ]
-            },
-            {
-                id: 'acc3',
-                name: 'Akun Pilihan',
-                price: 95000,
-                games: [
-                    { name: 'GTA V', logo: 'https://placehold.co/100x100/A0A0A0/ffffff?text=GTA+V' },
-                    { name: 'Cities Skylines', logo: 'https://placehold.co/100x100/E8E8E8/4A4A4A?text=Cities+SK' }
-                ]
-            }
-        ];
-
-        // Fungsi untuk merender akun Steam
-        function renderSteamAccounts() {
-            const container = document.getElementById('steam-accounts-container');
-            container.innerHTML = '';
-            steamAccounts.forEach(account => {
-                const gamesHtml = account.games.map(game =>
-                    `<img src="${game.logo}" alt="${game.name} Logo" class="game-logo">`
-                ).join('');
-
-                const cardHtml = `
-                    <div class="card p-6 flex flex-col items-center text-center">
-                        <div class="game-logo-container mb-8">
-                            ${gamesHtml}
-                        </div>
-                        <h3 class="text-2xl font-semibold text-gray-800">${account.name}</h3>
-                        <p class="text-xl font-bold text-gray-800 mt-2">Rp ${account.price.toLocaleString('id-ID')}</p>
-                        <button class="btn mt-4 w-full purchase-btn" data-product="${account.name}">Pesan Sekarang</button>
-                    </div>
-                `;
-                container.innerHTML += cardHtml;
-            });
-        }
-        
-        // Listener untuk tombol "Pesan Sekarang"
-        function setupListeners() {
-            document.querySelectorAll('.purchase-btn').forEach(button => {
-                button.addEventListener('click', async (event) => {
-                    purchaseData.product = event.target.dataset.product;
-                    purchaseData.price = event.target.closest('.card').querySelector('.text-xl.font-bold').textContent.trim();
-                    
-                    const userId = auth.currentUser ? auth.currentUser.uid : crypto.randomUUID();
-                    const newOrderRef = doc(collection(db, `artifacts/${appId}/public/data/orders`));
-                    purchaseData.orderId = newOrderRef.id;
-
-                    // Tampilkan order ID di modal
-                    document.getElementById('order-id-display').textContent = `ID Pesanan Anda: ${purchaseData.orderId}`;
-                    document.getElementById('purchase-modal').classList.remove('hidden');
-                });
-            });
-            
-            document.getElementById('confirm-purchase-btn').addEventListener('click', async () => {
-                document.getElementById('purchase-modal').classList.add('hidden');
-                const orderRef = doc(db, `artifacts/${appId}/public/data/orders`, purchaseData.orderId);
-                
-                try {
-                    await setDoc(orderRef, {
-                        product: purchaseData.product,
-                        price: purchaseData.price,
-                        status: "Pending",
-                        createdAt: new Date(),
-                        userId: auth.currentUser ? auth.currentUser.uid : 'anon-' + crypto.randomUUID()
-                    });
-                    
-                    const waText = encodeURIComponent(`Halo, saya ingin memesan produk "${purchaseData.product}" dengan ID pesanan: ${purchaseData.orderId}.`);
-                    window.location.href = `https://wa.me/6281944589876?text=${waText}`;
-                } catch (e) {
-                    console.error("Error adding document: ", e);
-                }
-            });
-
-            document.getElementById('cancel-purchase-btn').addEventListener('click', () => {
-                document.getElementById('purchase-modal').classList.add('hidden');
-            });
-            
-            document.getElementById('menu-btn').addEventListener('click', () => {
-                const menu = document.getElementById('nav-menu');
-                menu.classList.toggle('hidden');
-            });
-
-            // Login/Register button listeners
-            document.getElementById('login-btn-desktop').addEventListener('click', () => {
-                document.getElementById('auth-modal').classList.remove('hidden');
-                document.getElementById('auth-title').textContent = 'Masuk';
-                document.getElementById('auth-submit-btn').textContent = 'Masuk';
-                document.getElementById('auth-toggle-text').innerHTML = `Belum punya akun? <button id="auth-toggle-btn" class="text-yellow-500 hover:underline">Daftar sekarang</button>`;
-                document.getElementById('auth-toggle-btn').addEventListener('click', toggleAuthMode);
-            });
-
-            document.getElementById('login-btn-mobile').addEventListener('click', () => {
-                document.getElementById('auth-modal').classList.remove('hidden');
-                document.getElementById('auth-title').textContent = 'Masuk';
-                document.getElementById('auth-submit-btn').textContent = 'Masuk';
-                document.getElementById('auth-toggle-text').innerHTML = `Belum punya akun? <button id="auth-toggle-btn" class="text-yellow-500 hover:underline">Daftar sekarang</button>`;
-                document.getElementById('auth-toggle-btn').addEventListener('click', toggleAuthMode);
-            });
-            
-            // Login/Register form listener
-            document.getElementById('auth-form').addEventListener('submit', async (e) => {
-                e.preventDefault();
-                const email = document.getElementById('auth-email').value;
-                const password = document.getElementById('auth-password').value;
-                const isRegisterMode = document.getElementById('auth-submit-btn').textContent === 'Daftar';
-
-                try {
-                    if (isRegisterMode) {
-                        const userCredential = await createUserWithEmailAndPassword(auth, email, password);
-                        const user = userCredential.user;
-                        await setDoc(doc(db, `artifacts/${appId}/users/${user.uid}/userData/profile`), { isAdmin: false });
-                        // Use a custom message box instead of alert
-                        console.log('Pendaftaran berhasil! Silakan masuk.');
-                        toggleAuthMode();
-                    } else {
-                        await signInWithEmailAndPassword(auth, email, password);
-                        document.getElementById('auth-modal').classList.add('hidden');
-                    }
-                } catch (error) {
-                    console.error("Authentication error:", error);
-                    // Perbaiki: Tambahkan pesan error yang lebih spesifik
-                    if (error.code === 'auth/operation-not-allowed') {
-                        console.error('ERROR SPESIFIK: Operasi login/daftar belum diaktifkan di Firebase Console. Pastikan Email/Password sudah "Enabled".');
-                    }
-                    console.error(`Gagal ${isRegisterMode ? 'daftar' : 'masuk'}. Silakan coba lagi. Error: ${error.message}`);
-                }
-            });
-        }
-        
-        function toggleAuthMode() {
-            const title = document.getElementById('auth-title');
-            const submitBtn = document.getElementById('auth-submit-btn');
-            const toggleText = document.getElementById('auth-toggle-text');
-
-            if (submitBtn.textContent === 'Masuk') {
-                title.textContent = 'Daftar';
-                submitBtn.textContent = 'Daftar';
-                toggleText.innerHTML = `Sudah punya akun? <button id="auth-toggle-btn" class="text-yellow-500 hover:underline">Masuk</button>`;
-            } else {
-                title.textContent = 'Masuk';
-                submitBtn.textContent = 'Masuk';
-                toggleText.innerHTML = `Belum punya akun? <button id="auth-toggle-btn" class="text-yellow-500 hover:underline">Daftar sekarang</button>`;
-            }
-            document.getElementById('auth-toggle-btn').addEventListener('click', toggleAuthMode);
-        }
-
-        // Admin Panel Functions
-        function handleLogout() {
-            signOut(auth).then(() => {
-                console.log("User signed out.");
-                document.getElementById('admin-panel').classList.add('hidden');
-                document.getElementById('main-content').classList.remove('hidden');
-            }).catch((error) => {
-                console.error("Error signing out:", error);
-            });
-        }
-        
-        async function loadAdminData(uid) {
-            console.log("Loading admin data for:", uid);
-            setupAdminListeners();
-            loadOrders();
-            loadUsers();
-            loadAds();
-            checkMaintenanceStatusAdmin();
-        }
-        
-        function setupAdminListeners() {
-            document.querySelectorAll('.tab-btn').forEach(btn => {
-                btn.addEventListener('click', () => {
-                    document.querySelectorAll('.tab-btn').forEach(b => b.classList.remove('active-tab', 'border-yellow-500'));
-                    document.querySelectorAll('.tab-page').forEach(p => p.classList.add('hidden'));
-                    btn.classList.add('active-tab', 'border-yellow-500');
-                    document.getElementById(`${btn.dataset.tab}-tab`).classList.remove('hidden');
-                });
-            });
-
-            document.getElementById('logout-btn').addEventListener('click', handleLogout);
-
-            document.getElementById('add-product-form').addEventListener('submit', async (e) => {
-                e.preventDefault();
-                const name = document.getElementById('product-name').value;
-                const price = document.getElementById('product-price').value;
-                const description = document.getElementById('product-description').value;
-                const category = document.getElementById('product-category').value;
-                
-                try {
-                    await addDoc(collection(db, `artifacts/${appId}/public/data/products`), {
-                        name, price, description, category, createdAt: new Date()
-                    });
-                    console.log('Produk berhasil ditambahkan!');
-                    document.getElementById('add-product-form').reset();
-                } catch (e) {
-                    console.error("Error adding product:", e);
-                    console.error('Gagal menambahkan produk.');
-                }
-            });
-            
-            document.getElementById('add-user-form').addEventListener('submit', async (e) => {
-                e.preventDefault();
-                const email = document.getElementById('new-user-email').value;
-                const password = document.getElementById('new-user-password').value;
-                const role = document.getElementById('new-user-role').value;
-                const isAdmin = role === 'admin';
-                
-                try {
-                    const userCredential = await createUserWithEmailAndPassword(auth, email, password);
-                    const newUser = userCredential.user;
-                    await setDoc(doc(db, `artifacts/${appId}/users/${newUser.uid}/userData/profile`), { isAdmin: isAdmin });
-                    console.log(`Pengguna ${email} berhasil ditambahkan!`);
-                    document.getElementById('add-user-form').reset();
-                } catch (error) {
-                    console.error("Error adding user:", error);
-                    console.error(`Gagal menambahkan pengguna. Error: ${error.message}`);
-                }
-            });
-
-            document.getElementById('add-ad-form').addEventListener('submit', async (e) => {
-                e.preventDefault();
-                const adText = document.getElementById('ad-text').value;
-                try {
-                    await addDoc(collection(db, `artifacts/${appId}/public/data/ads`), {
-                        text: adText, createdAt: new Date()
-                    });
-                    console.log('Iklan berhasil ditambahkan!');
-                    document.getElementById('add-ad-form').reset();
-                } catch (e) {
-                    console.error("Error adding ad:", e);
-                    console.error('Gagal menambahkan iklan.');
-                }
-            });
-
-            document.getElementById('toggle-maintenance-btn').addEventListener('click', async () => {
-                const statusRef = doc(db, `artifacts/${appId}/public/data/app_status`, "maintenance");
-                try {
-                    const statusDoc = await getDoc(statusRef);
-                    const currentStatus = statusDoc.exists() && statusDoc.data().isMaintenance;
-                    await setDoc(statusRef, { isMaintenance: !currentStatus });
-                } catch (e) {
-                    console.error("Error toggling maintenance:", e);
-                }
-            });
-        }
-        
-        async function loadAds() {
-             const adsList = document.getElementById('ads-list');
-             adsList.innerHTML = '';
-             onSnapshot(collection(db, `artifacts/${appId}/public/data/ads`), (snapshot) => {
-                adsList.innerHTML = `<h3 class="text-xl font-semibold mb-2">Iklan Aktif</h3>`;
-                if (snapshot.empty) {
-                    adsList.innerHTML += `<p class="text-gray-500">Tidak ada iklan aktif.</p>`;
-                    return;
-                }
-                snapshot.forEach(doc => {
-                    const ad = doc.data();
-                    adsList.innerHTML += `<p class="p-2 bg-gray-100 rounded my-2">${ad.text} <button class="text-red-500 ml-4 delete-ad-btn" data-id="${doc.id}"><i class="fas fa-trash"></i></button></p>`;
-                });
-                document.querySelectorAll('.delete-ad-btn').forEach(btn => {
-                    btn.addEventListener('click', async () => {
-                        try {
-                            await deleteDoc(doc(db, `artifacts/${appId}/public/data/ads`, btn.dataset.id));
-                        } catch (e) {
-                            console.error("Error deleting ad:", e);
-                        }
-                    });
-                });
-             });
-        }
-        
-        async function loadOrders() {
-            const ordersList = document.getElementById('orders-list');
-            ordersList.innerHTML = `<p class="text-center text-gray-500">Memuat pesanan...</p>`;
-            
-            onSnapshot(collection(db, `artifacts/${appId}/public/data/orders`), (snapshot) => {
-                ordersList.innerHTML = '';
-                if (snapshot.empty) {
-                    ordersList.innerHTML = `<p class="text-center text-gray-500">Belum ada pesanan.</p>`;
-                    return;
-                }
-                
-                snapshot.forEach(doc => {
-                    const order = doc.data();
-                    const orderId = doc.id;
-                    ordersList.innerHTML += `
-                        <div class="p-4 border-b border-gray-200">
-                            <p class="font-semibold">ID Pesanan: <span class="font-bold text-yellow-500">${orderId}</span></p>
-                            <p>Produk: ${order.product}</p>
-                            <p>Harga: ${order.price}</p>
-                            <p>Status: <span class="${order.status === 'Pending' ? 'text-red-500' : 'text-green-500'} font-semibold">${order.status}</span></p>
-                            <div class="mt-2 space-x-2">
-                                <button class="text-blue-500 edit-order-btn" data-id="${orderId}">Edit</button>
-                                <button class="text-red-500 delete-order-btn" data-id="${orderId}">Hapus</button>
-                                <button class="text-orange-500 warn-order-btn" data-id="${orderId}">Beri Peringatan</button>
-                            </div>
-                        </div>
-                    `;
-                });
-                
-                // Add event listeners for new buttons
-                document.querySelectorAll('.delete-order-btn').forEach(btn => {
-                    btn.addEventListener('click', async () => {
-                        try {
-                            await deleteDoc(doc(db, `artifacts/${appId}/public/data/orders`, btn.dataset.id));
-                        } catch (e) { console.error("Error deleting order:", e); }
-                    });
-                });
-                
-                // Placeholder for Edit and Warn functionality
-                document.querySelectorAll('.edit-order-btn, .warn-order-btn').forEach(btn => {
-                    btn.addEventListener('click', () => {
-                        console.log(`Fitur ${btn.textContent} untuk ID ${btn.dataset.id} akan diimplementasikan.`);
-                    });
-                });
-            });
-        }
-        
-        async function loadUsers() {
-             const usersList = document.getElementById('users-list');
-             usersList.innerHTML = `<p class="text-center text-gray-500">Memuat data pengguna...</p>`;
-             onSnapshot(collection(db, `artifacts/${appId}/users`), (snapshot) => {
-                 usersList.innerHTML = '';
-                 if (snapshot.empty) {
-                    usersList.innerHTML = `<p class="text-center text-gray-500">Tidak ada pengguna terdaftar.</p>`;
-                    return;
-                 }
-                 snapshot.forEach(userDoc => {
-                     const userId = userDoc.id;
-                     onSnapshot(doc(db, `artifacts/${appId}/users/${userId}/userData/profile`), (profileDoc) => {
-                         const profile = profileDoc.data() || {};
-                         const isAdmin = profile.isAdmin ? "Admin" : "Pengguna Biasa";
-                         usersList.innerHTML += `
-                            <div class="p-4 border-b border-gray-200">
-                                <p class="font-semibold">ID Pengguna: <span class="font-mono text-xs">${userId}</span></p>
-                                <p>Role: <span class="font-bold ${isAdmin === 'Admin' ? 'text-green-500' : 'text-blue-500'}">${isAdmin}</span></p>
-                                <button class="text-purple-500 mt-2 toggle-admin-btn" data-id="${userId}" data-is-admin="${profile.isAdmin || false}">
-                                    ${isAdmin === 'Admin' ? 'Jadikan Pengguna Biasa' : 'Jadikan Admin'}
-                                </button>
-                            </div>
-                         `;
-                         // Add event listeners for new buttons
-                         document.querySelectorAll('.toggle-admin-btn').forEach(btn => {
-                             btn.addEventListener('click', async () => {
-                                 const targetId = btn.dataset.id;
-                                 const isCurrentlyAdmin = btn.dataset.isAdmin === 'true';
-                                 try {
-                                     await setDoc(doc(db, `artifacts/${appId}/users/${targetId}/userData/profile`), { isAdmin: !isCurrentlyAdmin }, { merge: true });
-                                 } catch (e) { console.error("Error toggling admin status:", e); }
-                             });
-                         });
-                     });
-                 });
-             });
-        }
-        
-        async function checkMaintenanceStatusAdmin() {
-            const statusRef = doc(db, `artifacts/${appId}/public/data/app_status`, "maintenance");
-            onSnapshot(statusRef, (docSnap) => {
-                const isMaintenance = docSnap.exists() && docSnap.data().isMaintenance;
-                const statusText = document.getElementById('maintenance-status');
-                const btn = document.getElementById('toggle-maintenance-btn');
-                if (isMaintenance) {
-                    statusText.innerHTML = `Status: <span class="font-bold text-red-500">Maintenance</span>`;
-                    btn.textContent = 'Nonaktifkan Maintenance';
-                    btn.classList.remove('bg-yellow-500', 'hover:bg-yellow-600');
-                    btn.classList.add('bg-gray-400', 'hover:bg-gray-500');
-                } else {
-                    statusText.innerHTML = `Status: <span class="font-bold text-green-500">Normal</span>`;
-                    btn.textContent = 'Aktifkan Maintenance';
-                    btn.classList.remove('bg-gray-400', 'hover:bg-gray-500');
-                    btn.classList.add('bg-yellow-500', 'hover:bg-yellow-600');
-                }
-            });
-        }
-
-        // Shortcut Shift + A + S
-        let keysPressed = {};
-        document.addEventListener('keydown', (e) => {
-            keysPressed[e.key] = true;
-            if (keysPressed['Shift'] && keysPressed['a'] && keysPressed['s']) {
-                document.getElementById('auth-modal').classList.remove('hidden');
-                document.getElementById('auth-title').textContent = 'Masuk Admin';
-                document.getElementById('auth-submit-btn').textContent = 'Masuk Admin';
-                document.getElementById('auth-toggle-text').classList.add('hidden');
-            }
-        });
-        document.addEventListener('keyup', (e) => {
-            delete keysPressed[e.key];
-        });
-        
-        // Initial setup on window load
-        window.onload = () => {
-            // Hide loading screen after 3 seconds
-            setTimeout(() => {
-                document.getElementById('loading-screen').classList.add('hidden');
-            }, 3000);
-            handleAuthentication();
-        };
-
-    </script>
 </body>
 </html>
