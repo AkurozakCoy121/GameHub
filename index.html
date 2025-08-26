@@ -69,7 +69,7 @@
             const productList = document.getElementById('product-list');
             productList.innerHTML = `<div class="col-span-1 md:col-span-2 lg:col-span-3 text-center py-8"><p class="text-gray-500 italic">Memuat produk...</p></div>`;
             
-            const productsRef = collection(db, `artifacts/${__app_id}/public/data/products`);
+            const productsRef = collection(db, `artifacts_${__app_id}_public_data_products`);
             let q = productsRef;
             if (category) {
                 q = query(productsRef, where('category', '==', category));
@@ -125,7 +125,7 @@
         async function renderAds() {
             const adBanner = document.getElementById('ad-banner');
             adBanner.innerHTML = '';
-            const adsRef = collection(db, `artifacts/${__app_id}/public/data/ads`);
+            const adsRef = collection(db, `artifacts_${__app_id}_public_data_ads`);
             
             try {
                 const querySnapshot = await getDocs(adsRef);
@@ -142,8 +142,8 @@
         
         // Function to place an order
         async function placeOrder(productId) {
-            const ordersRef = collection(db, `artifacts/${__app_id}/public/data/orders`);
-            const accountsRef = collection(db, `artifacts/${__app_id}/public/data/available_accounts`);
+            const ordersRef = collection(db, `artifacts_${__app_id}_public_data_orders`);
+            const accountsRef = collection(db, `artifacts_${__app_id}_public_data_available_accounts`);
             
             try {
                 // Check for available account
@@ -160,7 +160,7 @@
                 const accountData = accountDoc.data();
 
                 // Get product details
-                const productDoc = await getDoc(doc(db, `artifacts/${__app_id}/public/data/products/${productId}`));
+                const productDoc = await getDoc(doc(db, `artifacts_${__app_id}_public_data_products`, productId));
                 const product = productDoc.data();
                 
                 // Create a unique order ID
@@ -215,7 +215,7 @@
         const renderAdminProducts = () => {
             const productsList = document.getElementById('admin-products-list');
             // Use onSnapshot for real-time updates
-            onSnapshot(collection(db, `artifacts/${__app_id}/public/data/products`), (snapshot) => {
+            onSnapshot(collection(db, `artifacts_${__app_id}_public_data_products`), (snapshot) => {
                 productsList.innerHTML = '';
                 snapshot.forEach(doc => {
                     const product = doc.data();
@@ -250,7 +250,7 @@
 
                     document.getElementById('confirm-delete-btn').addEventListener('click', async () => {
                         try {
-                            await deleteDoc(doc(db, `artifacts/${__app_id}/public/data/products/${productId}`));
+                            await deleteDoc(doc(db, `artifacts_${__app_id}_public_data_products`, productId));
                             showNotification('Produk berhasil dihapus!');
                         } catch (error) {
                             console.error("Error deleting product:", error);
@@ -281,7 +281,7 @@
             };
 
             try {
-                await addDoc(collection(db, `artifacts/${__app_id}/public/data/products`), newProduct);
+                await addDoc(collection(db, `artifacts_${__app_id}_public_data_products`), newProduct);
                 showNotification('Produk berhasil ditambahkan!');
                 form.reset();
             } catch (error) {
@@ -293,7 +293,7 @@
         // Function to render orders in admin panel
         const renderAdminOrders = () => {
             const ordersList = document.getElementById('admin-orders-list');
-            onSnapshot(collection(db, `artifacts/${__app_id}/public/data/orders`), (snapshot) => {
+            onSnapshot(collection(db, `artifacts_${__app_id}_public_data_orders`), (snapshot) => {
                 ordersList.innerHTML = '';
                 snapshot.forEach(doc => {
                     const order = doc.data();
@@ -317,10 +317,10 @@
                 
                 document.querySelectorAll('.message-btn').forEach(btn => btn.addEventListener('click', async (e) => {
                     const orderDocId = e.target.dataset.id;
-                    const orderDoc = await getDoc(doc(db, `artifacts/${__app_id}/public/data/orders/${orderDocId}`));
+                    const orderDoc = await getDoc(doc(db, `artifacts_${__app_id}_public_data_orders`, orderDocId));
                     const orderData = orderDoc.data();
                     
-                    const accountDoc = await getDoc(doc(db, `artifacts/${__app_id}/public/data/available_accounts/${orderData.accountId}`));
+                    const accountDoc = await getDoc(doc(db, `artifacts_${__app_id}_public_data_available_accounts`, orderData.accountId));
                     const accountData = accountDoc.data();
                     
                     const message = `ID Pesanan: ${orderData.orderId}\nProduk: ${orderData.productName}\n\nDetail Akun:\nUsername: ${accountData.username}\nPassword: ${accountData.password}`;
@@ -334,7 +334,7 @@
                 document.querySelectorAll('.complete-order-btn').forEach(btn => btn.addEventListener('click', async (e) => {
                     const orderDocId = e.target.dataset.id;
                     try {
-                        await updateDoc(doc(db, `artifacts/${__app_id}/public/data/orders/${orderDocId}`), {
+                        await updateDoc(doc(db, `artifacts_${__app_id}_public_data_orders`, orderDocId), {
                             status: 'completed'
                         });
                         showNotification('Pesanan berhasil diselesaikan!');
@@ -360,7 +360,7 @@
         // Function to render accounts in admin panel
         const renderAdminAccounts = () => {
             const accountsList = document.getElementById('admin-accounts-list');
-            onSnapshot(collection(db, `artifacts/${__app_id}/public/data/available_accounts`), (snapshot) => {
+            onSnapshot(collection(db, `artifacts_${__app_id}_public_data_available_accounts`), (snapshot) => {
                 accountsList.innerHTML = '';
                 snapshot.forEach(doc => {
                     const account = doc.data();
@@ -398,7 +398,7 @@
 
                     document.getElementById('confirm-delete-btn').addEventListener('click', async () => {
                         try {
-                            await deleteDoc(doc(db, `artifacts/${__app_id}/public/data/available_accounts/${accountId}`));
+                            await deleteDoc(doc(db, `artifacts_${__app_id}_public_data_available_accounts`, accountId));
                             showNotification('Akun berhasil dihapus!');
                         } catch (error) {
                             console.error("Error deleting account:", error);
@@ -426,7 +426,7 @@
             };
 
             try {
-                await addDoc(collection(db, `artifacts/${__app_id}/public/data/available_accounts`), newAccount);
+                await addDoc(collection(db, `artifacts_${__app_id}_public_data_available_accounts`), newAccount);
                 showNotification('Akun berhasil ditambahkan!');
                 form.reset();
             } catch (error) {
@@ -438,7 +438,7 @@
         // Function to render ads in admin panel
         const renderAdminAds = () => {
             const adsList = document.getElementById('admin-ads-list');
-            onSnapshot(collection(db, `artifacts/${__app_id}/public/data/ads`), (snapshot) => {
+            onSnapshot(collection(db, `artifacts_${__app_id}_public_data_ads`), (snapshot) => {
                 adsList.innerHTML = '';
                 snapshot.forEach(doc => {
                     const ad = doc.data();
@@ -473,7 +473,7 @@
 
                     document.getElementById('confirm-delete-btn').addEventListener('click', async () => {
                         try {
-                            await deleteDoc(doc(db, `artifacts/${__app_id}/public/data/ads/${adId}`));
+                            await deleteDoc(doc(db, `artifacts_${__app_id}_public_data_ads`, adId));
                             showNotification('Iklan berhasil dihapus!');
                         } catch (error) {
                             console.error("Error deleting ad:", error);
@@ -499,7 +499,7 @@
             };
 
             try {
-                await addDoc(collection(db, `artifacts/${__app_id}/public/data/ads`), newAd);
+                await addDoc(collection(db, `artifacts_${__app_id}_public_data_ads`), newAd);
                 showNotification('Iklan berhasil ditambahkan!');
                 form.reset();
             } catch (error) {
@@ -511,7 +511,7 @@
         // Function to render admins in admin panel
         const renderAdminAdmins = () => {
             const adminsList = document.getElementById('admin-admins-list');
-            onSnapshot(collection(db, `artifacts/${__app_id}/public/data/admins`), (snapshot) => {
+            onSnapshot(collection(db, `artifacts_${__app_id}_public_data_admins`), (snapshot) => {
                 adminsList.innerHTML = '';
                 snapshot.forEach(doc => {
                     const admin = doc.data();
@@ -544,7 +544,7 @@
 
                     document.getElementById('confirm-delete-btn').addEventListener('click', async () => {
                         try {
-                            await deleteDoc(doc(db, `artifacts/${__app_id}/public/data/admins/${adminId}`));
+                            await deleteDoc(doc(db, `artifacts_${__app_id}_public_data_admins`, adminId));
                             showNotification('Admin berhasil dihapus!');
                         } catch (error) {
                             console.error("Error deleting admin:", error);
@@ -571,7 +571,7 @@
                 const isAdmin = await checkIfAdmin(currentUser.uid);
                 if (isAdmin) {
                     const userCredential = await createUserWithEmailAndPassword(auth, email, password);
-                    await setDoc(doc(db, `artifacts/${__app_id}/public/data/admins`, userCredential.user.uid), { email: email, addedBy: currentUser.uid, createdAt: new Date() });
+                    await setDoc(doc(db, `artifacts_${__app_id}_public_data_admins`, userCredential.user.uid), { email: email, addedBy: currentUser.uid, createdAt: new Date() });
                     showNotification('Admin baru berhasil ditambahkan!');
                     form.reset();
                 } else {
@@ -589,14 +589,14 @@
         function showLoginUI() {
             document.getElementById('login-form-container').classList.remove('hidden');
             document.getElementById('register-form-container').classList.add('hidden');
-            document.getElementById('login-title').textContent = 'Login';
+            document.getElementById('login-title').textContent = 'Masuk';
         }
 
         // Function to show the register UI
         function showRegisterUI() {
             document.getElementById('login-form-container').classList.add('hidden');
             document.getElementById('register-form-container').classList.remove('hidden');
-            document.getElementById('login-title').textContent = 'Register';
+            document.getElementById('login-title').textContent = 'Daftar';
         }
         
         // Function to handle user login
@@ -625,7 +625,7 @@
             registerStatus.textContent = "Registering...";
             try {
                 const userCredential = await createUserWithEmailAndPassword(auth, email, password);
-                await setDoc(doc(db, `artifacts/${__app_id}/public/data/users`, userCredential.user.uid), { email: email, createdAt: new Date() });
+                await setDoc(doc(db, `artifacts_${__app_id}_public_data_users`, userCredential.user.uid), { email: email, createdAt: new Date() });
                 registerStatus.textContent = "Registrasi berhasil!";
                 hideModal('login-modal');
             } catch (error) {
@@ -637,7 +637,7 @@
         // Function to check if a user is an admin
         const checkIfAdmin = async (uid) => {
             if (!uid) return false;
-            const adminDoc = await getDoc(doc(db, `artifacts/${__app_id}/public/data/admins`, uid));
+            const adminDoc = await getDoc(doc(db, `artifacts_${__app_id}_public_data_admins`, uid));
             return adminDoc.exists();
         };
 
