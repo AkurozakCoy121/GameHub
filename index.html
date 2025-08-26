@@ -50,7 +50,7 @@
         function hideModal(id) {
             document.getElementById(id).style.display = 'none';
         }
-
+        
         // Function to show a notification
         function showNotification(message) {
             const notif = document.getElementById('notification');
@@ -69,8 +69,11 @@
             const productList = document.getElementById('product-list');
             productList.innerHTML = `<div class="col-span-1 md:col-span-2 lg:col-span-3 text-center py-8"><p class="text-gray-500 italic">Memuat produk...</p></div>`;
             
-            const productsRef = collection(db, `artifacts/${__app_id}/products`);
-            const q = query(productsRef, where('category', '==', category));
+            const productsRef = collection(db, `artifacts/${__app_id}/public/data/products`);
+            let q = productsRef;
+            if (category) {
+                q = query(productsRef, where('category', '==', category));
+            }
 
             try {
                 const querySnapshot = await getDocs(q);
@@ -122,7 +125,7 @@
         async function renderAds() {
             const adBanner = document.getElementById('ad-banner');
             adBanner.innerHTML = '';
-            const adsRef = collection(db, `artifacts/${__app_id}/ads`);
+            const adsRef = collection(db, `artifacts/${__app_id}/public/data/ads`);
             
             try {
                 const querySnapshot = await getDocs(adsRef);
@@ -139,8 +142,8 @@
         
         // Function to place an order
         async function placeOrder(productId) {
-            const ordersRef = collection(db, `artifacts/${__app_id}/orders`);
-            const accountsRef = collection(db, `artifacts/${__app_id}/available_accounts`);
+            const ordersRef = collection(db, `artifacts/${__app_id}/public/data/orders`);
+            const accountsRef = collection(db, `artifacts/${__app_id}/public/data/available_accounts`);
             
             try {
                 // Check for available account
@@ -157,7 +160,7 @@
                 const accountData = accountDoc.data();
 
                 // Get product details
-                const productDoc = await getDoc(doc(db, `artifacts/${__app_id}/products/${productId}`));
+                const productDoc = await getDoc(doc(db, `artifacts/${__app_id}/public/data/products/${productId}`));
                 const product = productDoc.data();
                 
                 // Create a unique order ID
@@ -179,7 +182,7 @@
                 await updateDoc(doc(accountsRef, accountId), { is_available: false });
                 
                 // Prepare and send to WhatsApp
-                const waNumber = '81944589876';
+                const waNumber = '6281944589876';
                 const message = `Halo KingzStore, saya ingin memesan akun ${product.name} (ID Pesanan: ${orderId}). Apakah akun ini masih tersedia?`;
                 window.location.href = `https://wa.me/${waNumber}?text=${encodeURIComponent(message)}`;
 
@@ -211,7 +214,8 @@
         // Function to render products in admin panel
         const renderAdminProducts = () => {
             const productsList = document.getElementById('admin-products-list');
-            onSnapshot(collection(db, `artifacts/${__app_id}/products`), (snapshot) => {
+            // Use onSnapshot for real-time updates
+            onSnapshot(collection(db, `artifacts/${__app_id}/public/data/products`), (snapshot) => {
                 productsList.innerHTML = '';
                 snapshot.forEach(doc => {
                     const product = doc.data();
@@ -226,18 +230,38 @@
                     `;
                     productsList.appendChild(productElement);
                 });
-
-                document.querySelectorAll('.delete-product-btn').forEach(btn => btn.addEventListener('click', async (e) => {
+                
+                // Use a custom modal instead of confirm()
+                document.querySelectorAll('.delete-product-btn').forEach(btn => btn.addEventListener('click', (e) => {
                     const productId = e.target.dataset.id;
-                    if (confirm('Apakah Anda yakin ingin menghapus produk ini?')) {
+                    const confirmationModal = document.createElement('div');
+                    confirmationModal.className = 'modal-overlay fixed inset-0 z-50 flex items-center justify-center';
+                    confirmationModal.innerHTML = `
+                        <div class="modal-content bg-white p-8 rounded-xl shadow-2xl text-center max-w-sm w-full">
+                            <h3 class="text-xl font-bold text-gray-900 mb-4">Konfirmasi Hapus</h3>
+                            <p class="text-gray-600 mb-6">Apakah Anda yakin ingin menghapus produk ini?</p>
+                            <div class="flex justify-center space-x-4">
+                                <button id="cancel-delete-btn" class="btn btn-secondary">Batal</button>
+                                <button id="confirm-delete-btn" class="btn btn-primary">Ya, Hapus</button>
+                            </div>
+                        </div>
+                    `;
+                    document.body.appendChild(confirmationModal);
+
+                    document.getElementById('confirm-delete-btn').addEventListener('click', async () => {
                         try {
-                            await deleteDoc(doc(db, `artifacts/${__app_id}/products/${productId}`));
+                            await deleteDoc(doc(db, `artifacts/${__app_id}/public/data/products/${productId}`));
                             showNotification('Produk berhasil dihapus!');
                         } catch (error) {
                             console.error("Error deleting product:", error);
                             showNotification('Gagal menghapus produk.');
                         }
-                    }
+                        confirmationModal.remove();
+                    });
+
+                    document.getElementById('cancel-delete-btn').addEventListener('click', () => {
+                        confirmationModal.remove();
+                    });
                 }));
             });
         };
@@ -257,7 +281,7 @@
             };
 
             try {
-                await addDoc(collection(db, `artifacts/${__app_id}/products`), newProduct);
+                await addDoc(collection(db, `artifacts/${__app_id}/public/data/products`), newProduct);
                 showNotification('Produk berhasil ditambahkan!');
                 form.reset();
             } catch (error) {
@@ -269,7 +293,7 @@
         // Function to render orders in admin panel
         const renderAdminOrders = () => {
             const ordersList = document.getElementById('admin-orders-list');
-            onSnapshot(collection(db, `artifacts/${__app_id}/orders`), (snapshot) => {
+            onSnapshot(collection(db, `artifacts/${__app_id}/public/data/orders`), (snapshot) => {
                 ordersList.innerHTML = '';
                 snapshot.forEach(doc => {
                     const order = doc.data();
@@ -278,9 +302,14 @@
                         <td class="px-6 py-4 whitespace-nowrap">${order.orderId}</td>
                         <td class="px-6 py-4 whitespace-nowrap">${order.productName}</td>
                         <td class="px-6 py-4 whitespace-nowrap">${order.price}</td>
-                        <td class="px-6 py-4 whitespace-nowrap">${order.status}</td>
+                        <td class="px-6 py-4 whitespace-nowrap">
+                            <span class="px-2 inline-flex text-xs leading-5 font-semibold rounded-full ${order.status === 'pending' ? 'bg-yellow-100 text-yellow-800' : order.status === 'completed' ? 'bg-green-100 text-green-800' : 'bg-red-100 text-red-800'}">
+                                ${order.status}
+                            </span>
+                        </td>
                         <td class="px-6 py-4 whitespace-nowrap text-right text-sm font-medium">
                             <button class="text-indigo-600 hover:text-indigo-900 mr-2 message-btn" data-id="${doc.id}">Lihat Pesan</button>
+                            <button class="text-green-600 hover:text-green-900 complete-order-btn" data-id="${doc.id}">Selesai</button>
                         </td>
                     `;
                     ordersList.appendChild(orderItem);
@@ -288,26 +317,50 @@
                 
                 document.querySelectorAll('.message-btn').forEach(btn => btn.addEventListener('click', async (e) => {
                     const orderDocId = e.target.dataset.id;
-                    const orderDoc = await getDoc(doc(db, `artifacts/${__app_id}/orders/${orderDocId}`));
+                    const orderDoc = await getDoc(doc(db, `artifacts/${__app_id}/public/data/orders/${orderDocId}`));
                     const orderData = orderDoc.data();
                     
-                    const accountDoc = await getDoc(doc(db, `artifacts/${__app_id}/available_accounts/${orderData.accountId}`));
+                    const accountDoc = await getDoc(doc(db, `artifacts/${__app_id}/public/data/available_accounts/${orderData.accountId}`));
                     const accountData = accountDoc.data();
                     
                     const message = `ID Pesanan: ${orderData.orderId}\nProduk: ${orderData.productName}\n\nDetail Akun:\nUsername: ${accountData.username}\nPassword: ${accountData.password}`;
                     showInfoModal(`
                         <h4 class="font-bold mb-2">Pesan Untuk Pelanggan</h4>
                         <p class="text-left whitespace-pre-wrap">${message}</p>
-                        <button onclick="navigator.clipboard.writeText('${message.replace(/\n/g, '\\n')}').then(() => showNotification('Pesan disalin!'))" class="btn btn-primary mt-4">Salin Pesan</button>
+                        <button onclick="copyToClipboard('${message}')" class="btn btn-primary mt-4">Salin Pesan</button>
                     `);
+                }));
+
+                document.querySelectorAll('.complete-order-btn').forEach(btn => btn.addEventListener('click', async (e) => {
+                    const orderDocId = e.target.dataset.id;
+                    try {
+                        await updateDoc(doc(db, `artifacts/${__app_id}/public/data/orders/${orderDocId}`), {
+                            status: 'completed'
+                        });
+                        showNotification('Pesanan berhasil diselesaikan!');
+                    } catch (error) {
+                        console.error("Error updating order:", error);
+                        showNotification('Gagal memperbarui pesanan.');
+                    }
                 }));
             });
         };
+
+        // Function to copy text to clipboard without using navigator.clipboard
+        function copyToClipboard(text) {
+            const tempInput = document.createElement('textarea');
+            tempInput.value = text;
+            document.body.appendChild(tempInput);
+            tempInput.select();
+            document.execCommand('copy');
+            document.body.removeChild(tempInput);
+            showNotification('Pesan disalin ke clipboard!');
+        }
         
         // Function to render accounts in admin panel
         const renderAdminAccounts = () => {
             const accountsList = document.getElementById('admin-accounts-list');
-            onSnapshot(collection(db, `artifacts/${__app_id}/available_accounts`), (snapshot) => {
+            onSnapshot(collection(db, `artifacts/${__app_id}/public/data/available_accounts`), (snapshot) => {
                 accountsList.innerHTML = '';
                 snapshot.forEach(doc => {
                     const account = doc.data();
@@ -329,15 +382,34 @@
                 
                 document.querySelectorAll('.delete-account-btn').forEach(btn => btn.addEventListener('click', async (e) => {
                     const accountId = e.target.dataset.id;
-                    if (confirm('Apakah Anda yakin ingin menghapus akun ini?')) {
+                    const confirmationModal = document.createElement('div');
+                    confirmationModal.className = 'modal-overlay fixed inset-0 z-50 flex items-center justify-center';
+                    confirmationModal.innerHTML = `
+                        <div class="modal-content bg-white p-8 rounded-xl shadow-2xl text-center max-w-sm w-full">
+                            <h3 class="text-xl font-bold text-gray-900 mb-4">Konfirmasi Hapus</h3>
+                            <p class="text-gray-600 mb-6">Apakah Anda yakin ingin menghapus akun ini?</p>
+                            <div class="flex justify-center space-x-4">
+                                <button id="cancel-delete-btn" class="btn btn-secondary">Batal</button>
+                                <button id="confirm-delete-btn" class="btn btn-primary">Ya, Hapus</button>
+                            </div>
+                        </div>
+                    `;
+                    document.body.appendChild(confirmationModal);
+
+                    document.getElementById('confirm-delete-btn').addEventListener('click', async () => {
                         try {
-                            await deleteDoc(doc(db, `artifacts/${__app_id}/available_accounts/${accountId}`));
+                            await deleteDoc(doc(db, `artifacts/${__app_id}/public/data/available_accounts/${accountId}`));
                             showNotification('Akun berhasil dihapus!');
                         } catch (error) {
                             console.error("Error deleting account:", error);
                             showNotification('Gagal menghapus akun.');
                         }
-                    }
+                        confirmationModal.remove();
+                    });
+
+                    document.getElementById('cancel-delete-btn').addEventListener('click', () => {
+                        confirmationModal.remove();
+                    });
                 }));
             });
         };
@@ -354,7 +426,7 @@
             };
 
             try {
-                await addDoc(collection(db, `artifacts/${__app_id}/available_accounts`), newAccount);
+                await addDoc(collection(db, `artifacts/${__app_id}/public/data/available_accounts`), newAccount);
                 showNotification('Akun berhasil ditambahkan!');
                 form.reset();
             } catch (error) {
@@ -366,14 +438,16 @@
         // Function to render ads in admin panel
         const renderAdminAds = () => {
             const adsList = document.getElementById('admin-ads-list');
-            onSnapshot(collection(db, `artifacts/${__app_id}/ads`), (snapshot) => {
+            onSnapshot(collection(db, `artifacts/${__app_id}/public/data/ads`), (snapshot) => {
                 adsList.innerHTML = '';
                 snapshot.forEach(doc => {
                     const ad = doc.data();
                     const adElement = document.createElement('tr');
                     adElement.innerHTML = `
                         <td class="px-6 py-4 whitespace-nowrap">${ad.description}</td>
-                        <td class="px-6 py-4 whitespace-nowrap">${ad.imageUrl.substring(0, 30)}...</td>
+                        <td class="px-6 py-4 whitespace-nowrap">
+                            <img src="${ad.imageUrl}" alt="Ad" class="h-10 w-10 rounded-full">
+                        </td>
                         <td class="px-6 py-4 whitespace-nowrap text-right text-sm font-medium">
                             <button class="text-red-600 hover:text-red-900 delete-ad-btn" data-id="${doc.id}">Hapus</button>
                         </td>
@@ -383,19 +457,38 @@
                 
                 document.querySelectorAll('.delete-ad-btn').forEach(btn => btn.addEventListener('click', async (e) => {
                     const adId = e.target.dataset.id;
-                    if (confirm('Apakah Anda yakin ingin menghapus iklan ini?')) {
+                    const confirmationModal = document.createElement('div');
+                    confirmationModal.className = 'modal-overlay fixed inset-0 z-50 flex items-center justify-center';
+                    confirmationModal.innerHTML = `
+                        <div class="modal-content bg-white p-8 rounded-xl shadow-2xl text-center max-w-sm w-full">
+                            <h3 class="text-xl font-bold text-gray-900 mb-4">Konfirmasi Hapus</h3>
+                            <p class="text-gray-600 mb-6">Apakah Anda yakin ingin menghapus iklan ini?</p>
+                            <div class="flex justify-center space-x-4">
+                                <button id="cancel-delete-btn" class="btn btn-secondary">Batal</button>
+                                <button id="confirm-delete-btn" class="btn btn-primary">Ya, Hapus</button>
+                            </div>
+                        </div>
+                    `;
+                    document.body.appendChild(confirmationModal);
+
+                    document.getElementById('confirm-delete-btn').addEventListener('click', async () => {
                         try {
-                            await deleteDoc(doc(db, `artifacts/${__app_id}/ads/${adId}`));
+                            await deleteDoc(doc(db, `artifacts/${__app_id}/public/data/ads/${adId}`));
                             showNotification('Iklan berhasil dihapus!');
                         } catch (error) {
                             console.error("Error deleting ad:", error);
                             showNotification('Gagal menghapus iklan.');
                         }
-                    }
+                        confirmationModal.remove();
+                    });
+
+                    document.getElementById('cancel-delete-btn').addEventListener('click', () => {
+                        confirmationModal.remove();
+                    });
                 }));
             });
         };
-
+        
         // Function to add a new ad
         const handleAddAd = async (event) => {
             event.preventDefault();
@@ -404,8 +497,9 @@
                 imageUrl: form.imageUrl.value,
                 description: form.description.value
             };
+
             try {
-                await addDoc(collection(db, `artifacts/${__app_id}/ads`), newAd);
+                await addDoc(collection(db, `artifacts/${__app_id}/public/data/ads`), newAd);
                 showNotification('Iklan berhasil ditambahkan!');
                 form.reset();
             } catch (error) {
@@ -413,57 +507,112 @@
                 showNotification('Gagal menambahkan iklan.');
             }
         };
-        
+
+        // Function to render admins in admin panel
+        const renderAdminAdmins = () => {
+            const adminsList = document.getElementById('admin-admins-list');
+            onSnapshot(collection(db, `artifacts/${__app_id}/public/data/admins`), (snapshot) => {
+                adminsList.innerHTML = '';
+                snapshot.forEach(doc => {
+                    const admin = doc.data();
+                    const adminElement = document.createElement('tr');
+                    adminElement.innerHTML = `
+                        <td class="px-6 py-4 whitespace-nowrap">${admin.email}</td>
+                        <td class="px-6 py-4 whitespace-nowrap">${admin.addedBy || 'N/A'}</td>
+                        <td class="px-6 py-4 whitespace-nowrap text-right text-sm font-medium">
+                            ${doc.id !== auth.currentUser.uid ? `<button class="text-red-600 hover:text-red-900 delete-admin-btn" data-id="${doc.id}">Hapus</button>` : 'Anda'}
+                        </td>
+                    `;
+                    adminsList.appendChild(adminElement);
+                });
+                
+                document.querySelectorAll('.delete-admin-btn').forEach(btn => btn.addEventListener('click', async (e) => {
+                    const adminId = e.target.dataset.id;
+                    const confirmationModal = document.createElement('div');
+                    confirmationModal.className = 'modal-overlay fixed inset-0 z-50 flex items-center justify-center';
+                    confirmationModal.innerHTML = `
+                        <div class="modal-content bg-white p-8 rounded-xl shadow-2xl text-center max-w-sm w-full">
+                            <h3 class="text-xl font-bold text-gray-900 mb-4">Konfirmasi Hapus</h3>
+                            <p class="text-gray-600 mb-6">Apakah Anda yakin ingin menghapus admin ini?</p>
+                            <div class="flex justify-center space-x-4">
+                                <button id="cancel-delete-btn" class="btn btn-secondary">Batal</button>
+                                <button id="confirm-delete-btn" class="btn btn-primary">Ya, Hapus</button>
+                            </div>
+                        </div>
+                    `;
+                    document.body.appendChild(confirmationModal);
+
+                    document.getElementById('confirm-delete-btn').addEventListener('click', async () => {
+                        try {
+                            await deleteDoc(doc(db, `artifacts/${__app_id}/public/data/admins/${adminId}`));
+                            showNotification('Admin berhasil dihapus!');
+                        } catch (error) {
+                            console.error("Error deleting admin:", error);
+                            showNotification('Gagal menghapus admin.');
+                        }
+                        confirmationModal.remove();
+                    });
+
+                    document.getElementById('cancel-delete-btn').addEventListener('click', () => {
+                        confirmationModal.remove();
+                    });
+                }));
+            });
+        };
+
         // Function to add a new admin
         const handleAddAdmin = async (event) => {
             event.preventDefault();
             const form = event.target;
             const email = form.adminEmail.value;
             const password = form.adminPassword.value;
-            
             try {
                 const currentUser = auth.currentUser;
                 const isAdmin = await checkIfAdmin(currentUser.uid);
-
                 if (isAdmin) {
                     const userCredential = await createUserWithEmailAndPassword(auth, email, password);
-                    await setDoc(doc(db, `artifacts/${__app_id}/admins`, userCredential.user.uid), {
-                        email: email,
-                        addedBy: currentUser.uid,
-                        createdAt: new Date()
-                    });
+                    await setDoc(doc(db, `artifacts/${__app_id}/public/data/admins`, userCredential.user.uid), { email: email, addedBy: currentUser.uid, createdAt: new Date() });
                     showNotification('Admin baru berhasil ditambahkan!');
                     form.reset();
                 } else {
-                    showNotification('Anda tidak memiliki izin untuk menambahkan admin.');
+                    showInfoModal('Anda tidak memiliki izin untuk menambahkan admin.');
                 }
             } catch (error) {
                 console.error("Error adding admin:", error);
-                showNotification('Gagal menambahkan admin: ' + error.message);
+                showInfoModal('Gagal menambahkan admin: ' + error.message);
             }
         };
-        
+
         // Function to check if a user is an admin
         const checkIfAdmin = async (uid) => {
             if (!uid) return false;
-            const adminDoc = await getDoc(doc(db, `artifacts/${__app_id}/admins`, uid));
+            const adminDoc = await getDoc(doc(db, `artifacts/${__app_id}/public/data/admins`, uid));
             return adminDoc.exists();
         };
-        
+
         // Function to manage display between user and admin
         function toggleAdminView(showAdmin) {
             const userContent = document.getElementById('user-content');
             const adminPanel = document.getElementById('admin-panel');
-            const toggleAdminBtn = document.getElementById('toggle-admin-panel-btn');
-
+            const toggleAdminBtnDesktop = document.getElementById('toggle-admin-panel-btn');
+            const toggleAdminBtnMobile = document.getElementById('mobile-toggle-admin-panel-btn');
+            
             if (showAdmin) {
-                toggleAdminBtn.classList.remove('hidden');
                 userContent.classList.add('hidden');
                 adminPanel.classList.remove('hidden');
+                toggleAdminBtnDesktop.textContent = 'Lihat Halaman Utama';
+                toggleAdminBtnMobile.textContent = 'Lihat Halaman Utama';
+                renderAdminProducts();
+                renderAdminOrders();
+                renderAdminAccounts();
+                renderAdminAds();
+                renderAdminAdmins();
             } else {
-                toggleAdminBtn.classList.add('hidden');
                 userContent.classList.remove('hidden');
                 adminPanel.classList.add('hidden');
+                toggleAdminBtnDesktop.textContent = 'Admin Panel';
+                toggleAdminBtnMobile.textContent = 'Admin Panel';
+                renderProducts();
             }
         }
 
@@ -477,16 +626,25 @@
         // Login & Logout buttons
         document.getElementById('login-btn').addEventListener('click', () => showModal('login-modal'));
         document.getElementById('logout-btn').addEventListener('click', () => signOut(auth));
-        
+        document.getElementById('mobile-login-btn').addEventListener('click', () => showModal('login-modal'));
+        document.getElementById('mobile-logout-btn').addEventListener('click', () => signOut(auth));
+        document.getElementById('toggle-admin-panel-btn').addEventListener('click', () => {
+            const adminPanel = document.getElementById('admin-panel');
+            toggleAdminView(adminPanel.classList.contains('hidden'));
+        });
+        document.getElementById('mobile-toggle-admin-panel-btn').addEventListener('click', () => {
+            const adminPanel = document.getElementById('admin-panel');
+            toggleAdminView(adminPanel.classList.contains('hidden'));
+        });
+
+
         // Handle login form submission
         document.getElementById('login-form').addEventListener('submit', async (event) => {
             event.preventDefault();
             const email = document.getElementById('login-email').value;
             const password = document.getElementById('login-password').value;
             const loginStatus = document.getElementById('login-status');
-            
             loginStatus.textContent = "Logging in...";
-            
             try {
                 await signInWithEmailAndPassword(auth, email, password);
                 loginStatus.textContent = "Login berhasil!";
@@ -501,7 +659,7 @@
         document.getElementById('close-login-modal').addEventListener('click', () => hideModal('login-modal'));
         document.getElementById('close-info-modal').addEventListener('click', () => hideModal('info-modal'));
         document.getElementById('cancel-order-btn').addEventListener('click', () => hideModal('order-modal'));
-        
+
         // Admin panel tab handlers
         document.querySelectorAll('.admin-tab-btn').forEach(button => {
             button.addEventListener('click', (e) => {
@@ -517,514 +675,466 @@
         document.getElementById('add-account-form').addEventListener('submit', handleAddAccount);
         document.getElementById('add-ad-form').addEventListener('submit', handleAddAd);
         document.getElementById('add-admin-form').addEventListener('submit', handleAddAdmin);
-        
-        // Admin panel visibility toggle
-        document.getElementById('toggle-admin-panel-btn').addEventListener('click', () => {
-            const userContent = document.getElementById('user-content');
-            const adminPanel = document.getElementById('admin-panel');
-            userContent.classList.toggle('hidden');
-            adminPanel.classList.toggle('hidden');
-        });
-        
-        // Fix navigation issue: navigate to main sections from admin panel
-        document.querySelectorAll('header nav a').forEach(link => {
-            link.addEventListener('click', (e) => {
-                e.preventDefault();
-                document.getElementById('user-content').classList.remove('hidden');
-                document.getElementById('admin-panel').classList.add('hidden');
-                const targetId = e.target.getAttribute('href').substring(1);
-                const targetElement = document.getElementById(targetId);
-                if (targetElement) {
-                    targetElement.scrollIntoView({ behavior: 'smooth' });
-                }
-            });
-        });
-        
-        // Event listener for category buttons
-        document.querySelectorAll('.tab-btn').forEach(button => {
-            button.addEventListener('click', (e) => {
-                document.querySelectorAll('.tab-btn').forEach(btn => btn.classList.remove('active-tab'));
-                e.target.classList.add('active-tab');
-                renderProducts(e.target.dataset.category);
-            });
-        });
-        
-        // F10 Shortcut Listener for Admin Panel
-        document.addEventListener('keydown', (e) => {
-            if (e.key === 'F10' && isAdminUser) {
-                e.preventDefault();
-                const userContent = document.getElementById('user-content');
-                const adminPanel = document.getElementById('admin-panel');
-                if (userContent.classList.contains('hidden')) {
-                    // Currently in admin panel, toggle to user view
-                    toggleAdminView(false);
-                } else {
-                    // Currently in user view, toggle to admin panel
-                    toggleAdminView(true);
-                }
-            }
-        });
-        
-        // Global authentication state listener: The new, improved logic
+
+        // Check auth state on page load
         onAuthStateChanged(auth, async (user) => {
-            const loginBtn = document.getElementById('login-btn');
-            const logoutBtn = document.getElementById('logout-btn');
-
             if (user) {
-                loginBtn.classList.add('hidden');
-                logoutBtn.classList.remove('hidden');
-                userId = user.uid; // Set the global userId
-
-                isAdminUser = await checkIfAdmin(user.uid);
-                toggleAdminView(isAdminUser);
-                
+                userId = user.uid;
+                isAdminUser = await checkIfAdmin(userId);
                 if (isAdminUser) {
-                    renderAdminOrders();
-                    renderAdminProducts();
-                    renderAdminAccounts();
-                    renderAdminAds();
+                    document.getElementById('login-btn').classList.add('hidden');
+                    document.getElementById('mobile-login-btn').classList.add('hidden');
+                    document.getElementById('toggle-admin-panel-btn').classList.remove('hidden');
+                    document.getElementById('mobile-toggle-admin-panel-btn').classList.remove('hidden');
+                    document.getElementById('logout-btn').classList.remove('hidden');
+                    document.getElementById('mobile-logout-btn').classList.remove('hidden');
+                    toggleAdminView(true);
+                } else {
+                    document.getElementById('login-btn').classList.add('hidden');
+                    document.getElementById('mobile-login-btn').classList.add('hidden');
+                    document.getElementById('toggle-admin-panel-btn').classList.add('hidden');
+                    document.getElementById('mobile-toggle-admin-panel-btn').classList.add('hidden');
+                    document.getElementById('logout-btn').classList.remove('hidden');
+                    document.getElementById('mobile-logout-btn').classList.remove('hidden');
+                    renderProducts();
+                    renderAds();
                 }
             } else {
-                loginBtn.classList.remove('hidden');
-                logoutBtn.classList.add('hidden');
-                toggleAdminView(false); // Hide admin button
+                userId = crypto.randomUUID();
                 isAdminUser = false;
+                document.getElementById('login-btn').classList.remove('hidden');
+                document.getElementById('mobile-login-btn').classList.remove('hidden');
+                document.getElementById('toggle-admin-panel-btn').classList.add('hidden');
+                document.getElementById('mobile-toggle-admin-panel-btn').classList.add('hidden');
+                document.getElementById('logout-btn').classList.add('hidden');
+                document.getElementById('mobile-logout-btn').classList.add('hidden');
+                renderProducts();
+                renderAds();
             }
-            
-            // Hide the loading overlay and show the main content
-            document.getElementById('loading-overlay').style.display = 'none';
-            document.getElementById('main-content').classList.remove('hidden');
-            
-            // Initial rendering of products and ads, now done after auth check
-            renderAds();
-            renderProducts('steam');
         });
         
-        // Initial authentication check on window load
-        window.onload = async function() {
-            document.getElementById('loading-overlay').style.display = 'flex';
-            try {
-                if (__initial_auth_token) {
+        // Initial setup for the app ID and token
+        window.onload = async () => {
+            const firebaseConfig = JSON.parse(typeof __firebase_config !== 'undefined' ? __firebase_config : '{}');
+            const app = initializeApp(firebaseConfig);
+            const auth = getAuth(app);
+            const db = getFirestore(app);
+
+            if (typeof __initial_auth_token !== 'undefined' && __initial_auth_token) {
+                try {
                     await signInWithCustomToken(auth, __initial_auth_token);
-                } else {
+                } catch (error) {
+                    console.error("Custom token sign-in failed:", error);
                     await signInAnonymously(auth);
                 }
-            } catch (error) {
-                console.error("Authentication failed:", error);
-                // Even if auth fails, we should still show the main site
-                document.getElementById('loading-overlay').style.display = 'none';
-                document.getElementById('main-content').classList.remove('hidden');
-                renderAds();
-                renderProducts('steam');
+            } else {
+                await signInAnonymously(auth);
             }
         };
 
     </script>
     <style>
+        @import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap');
         body {
             font-family: 'Inter', sans-serif;
+            background-color: #0f172a;
+            color: #e2e8f0;
         }
         .container {
-            max-width: 1200px;
-            margin: 0 auto;
-            padding: 1.5rem;
+            max-width: 1280px;
+            margin-left: auto;
+            margin-right: auto;
+            padding-left: 1rem;
+            padding-right: 1rem;
         }
-        .bg-pattern {
-            background-color: #FFFBEB;
-            background-image: radial-gradient(#FACC15 1px, transparent 1px);
-            background-size: 20px 20px;
-        }
-        .product-card {
-            background-color: #fff;
-            border-radius: 12px;
-            overflow: hidden;
-            box-shadow: 0 4px 12px rgba(0, 0, 0, 0.08);
-            transition: transform 0.2s, box-shadow 0.2s;
-        }
-        .product-card:hover {
-            transform: translateY(-5px);
-            box-shadow: 0 8px 24px rgba(0, 0, 0, 0.12);
+        .btn {
+            @apply px-4 py-2 rounded-xl font-semibold transition-colors duration-200;
         }
         .btn-primary {
-            background-color: #FACC15;
-            color: #1F2937;
-            font-weight: 600;
-            transition: background-color 0.2s;
+            @apply bg-yellow-500 text-gray-900 hover:bg-yellow-600;
         }
-        .btn-primary:hover {
-            background-color: #EAB308;
+        .btn-secondary {
+            @apply bg-gray-700 text-white hover:bg-gray-600;
         }
-        .nav-link {
-            transition: color 0.2s;
-        }
-        .nav-link:hover {
-            color: #FACC15;
-        }
-        .active-tab {
-            border-bottom: 3px solid #FACC15;
-            color: #FACC15;
-            font-weight: 600;
+        .product-card {
+            @apply bg-gray-800 rounded-xl shadow-lg overflow-hidden flex flex-col;
         }
         .modal-overlay {
-            background-color: rgba(0, 0, 0, 0.7);
-            transition: opacity 0.3s ease;
+            background-color: rgba(0, 0, 0, 0.75);
         }
         .modal-content {
-            animation: fadeIn 0.3s ease;
+            @apply bg-gray-800 text-white rounded-xl shadow-2xl;
         }
-        @keyframes fadeIn {
-            from { opacity: 0; transform: scale(0.9); }
-            to { opacity: 1; transform: scale(1); }
+        .input-field {
+            @apply w-full p-3 rounded-xl bg-gray-700 border border-gray-600 text-white placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-yellow-500;
         }
-        .animate-slide-in {
-            animation: slide-in 0.5s forwards;
+        .admin-tab-btn {
+            @apply px-4 py-2 text-sm font-medium text-gray-400 hover:text-white transition-colors duration-200;
         }
-        .animate-slide-out {
-            animation: slide-out 0.5s forwards;
+        .admin-tab-btn.active {
+            @apply text-white border-b-2 border-yellow-500;
         }
         @keyframes slide-in {
-            from { transform: translateX(100%); }
-            to { transform: translateX(0); }
+            from { transform: translateY(-100%); }
+            to { transform: translateY(0); }
         }
         @keyframes slide-out {
-            from { transform: translateX(0); }
-            to { transform: translateX(100%); }
+            from { transform: translateY(0); }
+            to { transform: translateY(-100%); }
+        }
+        .animate-slide-in {
+            animation: slide-in 0.5s ease-out forwards;
+        }
+        .animate-slide-out {
+            animation: slide-out 0.5s ease-in forwards;
         }
     </style>
 </head>
-<body class="bg-gray-100 text-gray-800">
+<body class="bg-gray-900 text-gray-100">
 
-    <!-- Loading Overlay -->
-    <div id="loading-overlay" class="fixed inset-0 bg-yellow-400 bg-opacity-90 z-50 flex flex-col items-center justify-center hidden">
-        <h1 class="text-4xl sm:text-5xl font-extrabold text-white animate-pulse">KingzStore</h1>
-        <p class="mt-4 text-white text-center px-4">Memuat data...</p>
-    </div>
-
-    <!-- Main Content -->
-    <div id="main-content" class="hidden">
-        
-        <!-- Header -->
-        <header class="bg-white shadow-sm sticky top-0 z-40">
-            <div class="container flex justify-between items-center py-4">
-                <a href="#" class="flex items-center space-x-2">
-                    <img src="https://iili.io/Kdi9uHl.jpg" alt="KingzStore Logo" class="h-10 w-10 rounded-full">
-                    <h1 class="text-2xl font-bold text-gray-900">KingzStore</h1>
-                </a>
-                <nav class="hidden md:flex items-center space-x-6">
-                    <button id="toggle-admin-panel-btn" class="nav-link text-gray-600 hover:text-yellow-500 hidden">Panel Admin</button>
-                    <a href="#products" class="nav-link text-gray-600 hover:text-yellow-500">Produk</a>
-                    <a href="#about" class="nav-link text-gray-600 hover:text-yellow-500">Tentang Kami</a>
-                    <a href="#contact" class="nav-link text-gray-600 hover:text-yellow-500">Kontak</a>
-                    <button id="login-btn" class="btn btn-secondary hidden">Login</button>
-                    <button id="logout-btn" class="btn btn-secondary hidden">Logout</button>
-                </nav>
-                <div class="md:hidden flex items-center space-x-2">
-                    <button id="mobile-menu-button" class="text-gray-600 focus:outline-none">
-                        <svg class="h-6 w-6" fill="none" stroke="currentColor" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg">
-                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 6h16M4 12h16m-7 6h7"></path>
-                        </svg>
-                    </button>
-                </div>
-            </div>
-            <!-- Mobile Menu -->
-            <nav id="mobile-menu" class="hidden md:hidden bg-white shadow-lg">
-                <button id="mobile-toggle-admin-panel-btn" class="block py-2 px-4 text-gray-800 hover:bg-gray-100 hidden">Panel Admin</button>
-                <a href="#products" class="block py-2 px-4 text-gray-800 hover:bg-gray-100">Produk</a>
-                <a href="#about" class="block py-2 px-4 text-gray-800 hover:bg-gray-100">Tentang Kami</a>
-                <a href="#contact" class="block py-2 px-4 text-gray-800 hover:bg-gray-100">Kontak</a>
-            </nav>
-        </header>
-
-        <!-- User Content (Main site content) -->
-        <div id="user-content" class="min-h-screen">
-            <!-- Ad Banner -->
-            <section id="ad-banner" class="container py-8 hidden">
-                <!-- Ads will be dynamically inserted here -->
-            </section>
-
-            <!-- Hero Section -->
-            <section class="bg-pattern py-20 px-4 sm:py-24">
-                <div class="container text-center">
-                    <h2 class="text-4xl sm:text-5xl lg:text-6xl font-extrabold text-gray-900">
-                        Akun Steam & Roblox Murah dan Terpercaya
-                    </h2>
-                    <p class="mt-4 text-lg sm:text-xl text-gray-600">
-                        KingzStore menyediakan akun gaming berkualitas dengan harga bersahabat.
-                    </p>
-                    <a href="#products" class="mt-8 inline-block btn btn-primary text-lg animate-bounce">Lihat Produk</a>
-                </div>
-            </section>
-
-            <!-- Product Section -->
-            <section id="products" class="py-16 bg-white">
-                <div class="container">
-                    <h2 class="text-3xl sm:text-4xl font-bold text-center mb-10">Produk Kami</h2>
-                    
-                    <div class="flex justify-center mb-8 space-x-4">
-                        <button data-category="steam" class="tab-btn active-tab pb-2">Akun Steam</button>
-                        <button data-category="roblox" class="tab-btn pb-2">Akun Roblox</button>
-                    </div>
-
-                    <div id="product-list" class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-8">
-                        <!-- Products will be dynamically inserted here -->
-                    </div>
-                </div>
-            </section>
+    <!-- Header -->
+    <header class="bg-gray-950 py-4 shadow-xl fixed top-0 left-0 right-0 z-40">
+        <div class="container flex items-center justify-between">
+            <a href="#" class="flex items-center space-x-2">
+                <img src="https://placehold.co/40x40/facc15/0f172a?text=K" alt="Logo" class="rounded-lg">
+                <span class="text-xl font-bold">KingzStore</span>
+            </a>
             
-            <!-- About Us Section -->
-            <section id="about" class="py-16 bg-gray-50">
-                <div class="container text-center">
-                    <h2 class="text-3xl sm:text-4xl font-bold mb-4">Tentang KingzStore</h2>
-                    <p class="text-gray-700 max-w-2xl mx-auto">
-                        KingzStore tidak hanya menyediakan akun Steam, tetapi juga menyediakan akun Roblox berkualitas. Kami berkomitmen untuk memberikan layanan terbaik, harga termurah, dan jaminan keamanan akun. Percayakan kebutuhan gaming Anda pada kami!
-                    </p>
-                    <div class="flex justify-center items-center mt-6 space-x-4 text-lg text-gray-600">
-                        <a href="https://wa.me/81944589876" class="hover:text-yellow-500 transition-colors">
-                            <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="currentColor"><path d="M12.04 2C7.306 2 3.407 5.898 3.407 10.634c0 1.25.332 2.453.957 3.52l-.66 2.375 2.44-.645a8.683 8.683 0 0011.83 3.666 8.683 8.683 0 003.666-11.83C20.692 3.86 16.792 2 12.04 2zM17 14.28c-.16.29-.98.71-1.12.79-.14.08-.29.13-.53.07-.24-.05-1.01-.36-1.92-.95-.9-.59-1.5-1.33-1.68-1.57-.18-.24-.18-.23-.37-.49-.18-.24-.46-.62-.65-.89-.19-.27-.4-2.14.77-3.62 1.17-1.48 2.07-1.42 2.76-1.42.69 0 1.05-.08 1.48.58.42.66.42 1.55.24 1.83-.18.29-.62.71-.85.95-.23.24-.46.33-.69.45-.24.12-.49.19-.73.08s-.59-.22-1.04-.44c-.45-.22-.96-.54-1.38-1.01-.42-.47-.23-.49-.16-.36.07.13.43.51.64.91.22.4.43.89.59 1.11.16.22.27.36.45.54.18.18.36.33.54.49.18.16.36.22.45.27.16.08.33.09.49.07s.45-.16 1.01-.42c.56-.27.91-.45 1.1-.48.18-.04.33.07.45.24.11.16.11.95-.27 1.83z"></path></svg>
-                            <span>Whatsapp</span>
-                        </a>
-                        <a href="https://www.instagram.com/Kingzzstore" class="hover:text-yellow-500 transition-colors">
-                            <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="currentColor"><path d="M12 2.163c3.204 0 3.584.012 4.85.07c3.252.148 4.61 1.637 4.758 4.758.058 1.266.07 1.646.07 4.85s-.012 3.584-.07 4.85c-.148 3.252-1.637 4.61-4.758 4.758-1.266.058-1.646.07-4.85.07s-3.584-.012-4.85-.07c-3.252-.148-4.61-1.637-4.758-4.758-.058-1.266-.07-1.646-.07-4.85s.012-3.584.07-4.85c.148-3.252 1.637 4.61 4.758 4.758 1.266-.058 1.646-.07 4.85-.07zm0-2.163c-3.259 0-3.66.014-4.94.072-4.148.19-6.393 2.434-6.582 6.582-.058 1.28-.072 1.681-.072 4.94s.014 3.66.072 4.94c.19 4.148 2.434 6.393 6.582 6.582 1.28.058 1.681.072 4.94.072s3.66-.014 4.94-.072c4.148-.19 6.393-2.434 6.582-6.582.058-1.28.072-1.681.072-4.94s-.014-3.66-.072-4.94c-.19-4.148-2.434-6.393-6.582-6.582-1.28-.058-1.681-.072-4.94-.072zm0 5.862c-3.41 0-6.182 2.772-6.182 6.182s2.772 6.182 6.182 6.182 6.182-2.772 6.182-6.182-2.772-6.182-6.182-6.182zm0 10.163c-2.208 0-3.98-1.772-3.98-3.98s1.772-3.98 3.98-3.98 3.98 1.772 3.98 3.98-1.772 3.98-3.98 3.98zm6.54-11.458c0 .666-.541 1.207-1.207 1.207s-1.207-.541-1.207-1.207.541-1.207 1.207-1.207 1.207.541 1.207 1.207z"></path></svg>
-                            <span>@Kingzzstore</span>
-                        </a>
-                    </div>
-                </div>
-            </section>
-        </div>
-
-        <!-- Admin Panel Section -->
-        <div id="admin-panel" class="min-h-screen hidden bg-gray-100 py-10">
-            <div class="container">
-                <h2 class="text-3xl font-bold mb-6">Panel Admin</h2>
-                <div class="bg-white p-6 rounded-lg shadow-md mb-6">
-                    <div class="flex space-x-4 mb-6">
-                        <button class="admin-tab-btn border-b-2 border-yellow-500 py-2" data-target="orders-tab">Pesanan</button>
-                        <button class="admin-tab-btn py-2" data-target="products-tab">Produk</button>
-                        <button class="admin-tab-btn py-2" data-target="accounts-tab">Akun</button>
-                        <button class="admin-tab-btn py-2" data-target="ads-tab">Iklan</button>
-                        <button class="admin-tab-btn py-2" data-target="admins-tab">Admin</button>
-                    </div>
-
-                    <!-- Orders Tab -->
-                    <div id="orders-tab" class="admin-tab-content">
-                        <h3 class="text-2xl font-semibold mb-4">Daftar Pesanan</h3>
-                        <div class="overflow-x-auto">
-                            <table class="min-w-full divide-y divide-gray-200">
-                                <thead class="bg-gray-50">
-                                    <tr>
-                                        <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">ID Pesanan</th>
-                                        <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Produk</th>
-                                        <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Harga</th>
-                                        <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Status</th>
-                                        <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Aksi</th>
-                                    </tr>
-                                </thead>
-                                <tbody id="admin-orders-list" class="bg-white divide-y divide-gray-200">
-                                    <!-- Orders will be dynamically inserted here -->
-                                </tbody>
-                            </table>
-                        </div>
-                    </div>
-
-                    <!-- Products Tab -->
-                    <div id="products-tab" class="admin-tab-content hidden">
-                        <h3 class="text-2xl font-semibold mb-4">Tambah Produk Baru</h3>
-                        <form id="add-product-form" class="space-y-4">
-                            <div>
-                                <label for="name" class="block text-sm font-medium text-gray-700">Nama Produk</label>
-                                <input type="text" id="name" name="name" class="mt-1 block w-full rounded-md border-gray-300 shadow-sm" required>
-                            </div>
-                            <div>
-                                <label for="category" class="block text-sm font-medium text-gray-700">Kategori</label>
-                                <select id="category" name="category" class="mt-1 block w-full rounded-md border-gray-300 shadow-sm" required>
-                                    <option value="steam">Steam</option>
-                                    <option value="roblox">Roblox</option>
-                                </select>
-                            </div>
-                            <div>
-                                <label for="price" class="block text-sm font-medium text-gray-700">Harga (contoh: Rp50.000)</label>
-                                <input type="text" id="price" name="price" class="mt-1 block w-full rounded-md border-gray-300 shadow-sm" required>
-                            </div>
-                            <div>
-                                <label for="discount" class="block text-sm font-medium text-gray-700">Diskon (%)</label>
-                                <input type="number" id="discount" name="discount" class="mt-1 block w-full rounded-md border-gray-300 shadow-sm">
-                            </div>
-                            <div>
-                                <label for="imageUrl" class="block text-sm font-medium text-gray-700">URL Gambar</label>
-                                <input type="url" id="imageUrl" name="imageUrl" class="mt-1 block w-full rounded-md border-gray-300 shadow-sm" required>
-                            </div>
-                            <div>
-                                <label for="description" class="block text-sm font-medium text-gray-700">Deskripsi (Pisahkan dengan koma)</label>
-                                <input type="text" id="description" name="description" class="mt-1 block w-full rounded-md border-gray-300 shadow-sm" required>
-                            </div>
-                            <button type="submit" class="btn btn-primary">Tambah Produk</button>
-                        </form>
-                        <h3 class="text-2xl font-semibold mt-8 mb-4">Daftar Produk</h3>
-                        <div class="overflow-x-auto">
-                            <table class="min-w-full divide-y divide-gray-200">
-                                <thead class="bg-gray-50">
-                                    <tr>
-                                        <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Nama</th>
-                                        <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Harga</th>
-                                        <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Diskon</th>
-                                        <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Aksi</th>
-                                    </tr>
-                                </thead>
-                                <tbody id="admin-products-list" class="bg-white divide-y divide-gray-200">
-                                    <!-- Product list will be dynamically inserted here -->
-                                </tbody>
-                            </table>
-                        </div>
-                    </div>
-
-                    <!-- Accounts Tab -->
-                    <div id="accounts-tab" class="admin-tab-content hidden">
-                        <h3 class="text-2xl font-semibold mb-4">Tambah Akun Tersedia</h3>
-                        <form id="add-account-form" class="space-y-4">
-                            <div>
-                                <label for="account-productId" class="block text-sm font-medium text-gray-700">ID Produk</label>
-                                <input type="text" id="account-productId" name="productId" class="mt-1 block w-full rounded-md border-gray-300 shadow-sm" placeholder="ID dari produk terkait" required>
-                            </div>
-                            <div>
-                                <label for="username" class="block text-sm font-medium text-gray-700">Username</label>
-                                <input type="text" id="username" name="username" class="mt-1 block w-full rounded-md border-gray-300 shadow-sm" required>
-                            </div>
-                            <div>
-                                <label for="password" class="block text-sm font-medium text-gray-700">Password</label>
-                                <input type="text" id="password" name="password" class="mt-1 block w-full rounded-md border-gray-300 shadow-sm" required>
-                            </div>
-                            <button type="submit" class="btn btn-primary">Tambah Akun</button>
-                        </form>
-                        <h3 class="text-2xl font-semibold mt-8 mb-4">Daftar Akun Tersedia</h3>
-                        <div class="overflow-x-auto">
-                            <table class="min-w-full divide-y divide-gray-200">
-                                <thead class="bg-gray-50">
-                                    <tr>
-                                        <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Username</th>
-                                        <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">ID Produk</th>
-                                        <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Status</th>
-                                        <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Aksi</th>
-                                    </tr>
-                                </thead>
-                                <tbody id="admin-accounts-list" class="bg-white divide-y divide-gray-200">
-                                    <!-- Accounts list will be dynamically inserted here -->
-                                </tbody>
-                            </table>
-                        </div>
-                    </div>
-
-                    <!-- Ads Tab -->
-                    <div id="ads-tab" class="admin-tab-content hidden">
-                        <h3 class="text-2xl font-semibold mb-4">Tambah Iklan Baru</h3>
-                        <form id="add-ad-form" class="space-y-4">
-                            <div>
-                                <label for="ad-imageUrl" class="block text-sm font-medium text-gray-700">URL Gambar Iklan</label>
-                                <input type="url" id="ad-imageUrl" name="imageUrl" class="mt-1 block w-full rounded-md border-gray-300 shadow-sm" required>
-                            </div>
-                            <div>
-                                <label for="ad-description" class="block text-sm font-medium text-gray-700">Deskripsi Iklan</label>
-                                <input type="text" id="ad-description" name="description" class="mt-1 block w-full rounded-md border-gray-300 shadow-sm" required>
-                            </div>
-                            <button type="submit" class="btn btn-primary">Tambah Iklan</button>
-                        </form>
-                        <h3 class="text-2xl font-semibold mt-8 mb-4">Daftar Iklan</h3>
-                        <div class="overflow-x-auto">
-                            <table class="min-w-full divide-y divide-gray-200">
-                                <thead class="bg-gray-50">
-                                    <tr>
-                                        <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Deskripsi</th>
-                                        <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">URL Gambar</th>
-                                        <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Aksi</th>
-                                    </tr>
-                                </thead>
-                                <tbody id="admin-ads-list" class="bg-white divide-y divide-gray-200">
-                                    <!-- Ads list will be dynamically inserted here -->
-                                </tbody>
-                            </table>
-                        </div>
-                    </div>
-
-                    <!-- Admins Tab -->
-                    <div id="admins-tab" class="admin-tab-content hidden">
-                        <h3 class="text-2xl font-semibold mb-4">Tambah Admin Baru</h3>
-                        <p class="text-sm text-gray-500 mb-4">Fitur ini hanya dapat digunakan oleh admin utama.</p>
-                        <form id="add-admin-form" class="space-y-4">
-                            <div>
-                                <label for="adminEmail" class="block text-sm font-medium text-gray-700">Email Admin</label>
-                                <input type="email" id="adminEmail" name="adminEmail" class="mt-1 block w-full rounded-md border-gray-300 shadow-sm" required>
-                            </div>
-                            <div>
-                                <label for="adminPassword" class="block text-sm font-medium text-gray-700">Password Admin</label>
-                                <input type="password" id="adminPassword" name="adminPassword" class="mt-1 block w-full rounded-md border-gray-300 shadow-sm" required>
-                            </div>
-                            <button type="submit" class="btn btn-primary">Tambah Admin</button>
-                        </form>
-                    </div>
-                </div>
-            </div>
-        </div>
-
-        <!-- Notification Pop-up -->
-        <div id="notification" class="fixed bottom-4 right-4 bg-gray-900 text-white px-6 py-3 rounded-lg shadow-xl hidden">
-            <!-- Notification message will be inserted here -->
-        </div>
-
-        <!-- Modals -->
-        <!-- Login Modal -->
-        <div id="login-modal" class="modal-overlay fixed inset-0 z-50 flex items-center justify-center hidden">
-            <div class="modal-content bg-white p-8 rounded-xl shadow-2xl max-w-sm w-full">
-                <h3 class="text-xl font-bold text-gray-900 mb-4 text-center">Login</h3>
-                <form id="login-form">
-                    <div class="mb-4">
-                        <label for="login-email" class="block text-gray-700">Email</label>
-                        <input type="email" id="login-email" class="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-yellow-500 focus:ring focus:ring-yellow-200 focus:ring-opacity-50" required>
-                    </div>
-                    <div class="mb-6">
-                        <label for="login-password" class="block text-gray-700">Password</label>
-                        <input type="password" id="login-password" class="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-yellow-500 focus:ring focus:ring-yellow-200 focus:ring-opacity-50" required>
-                    </div>
-                    <button type="submit" class="w-full btn btn-primary">Login</button>
-                    <p id="login-status" class="mt-4 text-center text-sm text-red-500"></p>
-                </form>
-                <div class="mt-4 text-center">
-                    <button id="close-login-modal" class="text-gray-500 hover:text-gray-700">Tutup</button>
-                </div>
-            </div>
-        </div>
-
-        <!-- Order Confirmation Modal -->
-        <div id="order-modal" class="modal-overlay fixed inset-0 z-50 flex items-center justify-center hidden">
-            <div class="modal-content bg-white p-8 rounded-xl shadow-2xl text-center max-w-sm w-full">
-                <h3 class="text-xl font-bold text-gray-900 mb-4">Yakin pesan sekarang?</h3>
-                <p class="text-gray-600 mb-6">Anda akan diarahkan ke WhatsApp untuk menyelesaikan pembelian.</p>
-                <div class="flex justify-center space-x-4">
-                    <button id="cancel-order-btn" class="btn btn-secondary">Batal</button>
-                    <button id="confirm-order-btn" class="btn btn-primary">Ya, Pesan Sekarang</button>
-                </div>
-            </div>
-        </div>
-
-        <!-- Info Modal -->
-        <div id="info-modal" class="modal-overlay fixed inset-0 z-50 flex items-center justify-center hidden">
-            <div class="modal-content bg-white p-8 rounded-xl shadow-2xl text-center max-w-sm w-full">
-                <h3 class="text-xl font-bold text-gray-900 mb-4">Informasi</h3>
-                <p id="info-message" class="text-gray-600 mb-6"></p>
-                <button id="close-info-modal" class="btn btn-primary">Tutup</button>
+            <!-- Desktop Navigation -->
+            <nav class="hidden md:flex items-center space-x-6">
+                <a href="#product" class="text-gray-400 hover:text-yellow-500 transition-colors">Produk</a>
+                <a href="#info" class="text-gray-400 hover:text-yellow-500 transition-colors">Tentang Kami</a>
+                <a href="#contact" class="text-gray-400 hover:text-yellow-500 transition-colors">Kontak</a>
+                <button id="toggle-admin-panel-btn" class="btn btn-secondary hidden">Admin Panel</button>
+                <button id="login-btn" class="btn btn-primary hidden">Masuk</button>
+                <button id="logout-btn" class="btn btn-secondary hidden">Keluar</button>
+            </nav>
+            
+            <!-- Mobile Menu Button -->
+            <div class="md:hidden flex items-center">
+                <button id="mobile-menu-button" class="text-gray-400 hover:text-yellow-500 focus:outline-none">
+                    <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 6h16M4 12h16m-7 6h7"></path>
+                    </svg>
+                </button>
             </div>
         </div>
         
-        <!-- Footer -->
-        <footer class="bg-gray-900 text-gray-400 py-8">
-            <div class="container text-center">
-                <p>&copy; 2024 KingzStore. Semua hak dilindungi.</p>
-                <div class="mt-4 flex justify-center space-x-4">
-                    <a href="#" class="hover:text-yellow-500">Kebijakan Privasi</a>
-                    <span class="text-gray-600">|</span>
-                    <a href="#" class="hover:text-yellow-500">Ketentuan Penggunaan</a>
-                </div>
-            </div>
-        </footer>
-        
+        <!-- Mobile Menu -->
+        <div id="mobile-menu" class="hidden md:hidden bg-gray-950 mt-4 p-4 space-y-4">
+            <a href="#product" class="block text-gray-400 hover:text-yellow-500">Produk</a>
+            <a href="#info" class="block text-gray-400 hover:text-yellow-500">Tentang Kami</a>
+            <a href="#contact" class="block text-gray-400 hover:text-yellow-500">Kontak</a>
+            <button id="mobile-toggle-admin-panel-btn" class="w-full btn btn-secondary hidden">Admin Panel</button>
+            <button id="mobile-login-btn" class="w-full btn btn-primary hidden">Masuk</button>
+            <button id="mobile-logout-btn" class="w-full btn btn-secondary hidden">Keluar</button>
+        </div>
+    </header>
+
+    <!-- Notification -->
+    <div id="notification" class="hidden fixed top-20 left-1/2 -translate-x-1/2 z-50 bg-green-500 text-white px-6 py-3 rounded-full shadow-lg text-center">
+        Pesan
     </div>
+
+    <!-- Main Content for Users -->
+    <div id="user-content" class="pt-24 min-h-screen">
+        <!-- Hero Section -->
+        <section class="relative bg-gray-950 py-20 text-center">
+            <div class="container relative z-10">
+                <h1 class="text-4xl md:text-6xl font-extrabold mb-4 animate-fade-in">Jual Akun Steam dan Roblox Terpercaya</h1>
+                <p class="text-lg md:text-xl text-gray-400 mb-8 animate-fade-in-delay-1">Kualitas Terjamin, Harga Bersahabat. Pengiriman Cepat dan Aman!</p>
+                <button id="cta-btn" class="btn btn-primary text-lg md:text-xl animate-fade-in-delay-2">Lihat Produk</button>
+            </div>
+            <div class="absolute inset-0 z-0 bg-cover bg-center" style="background-image: url('https://placehold.co/1920x1080/0f172a/9ca3af?text=Banner+KingzStore'); filter: blur(4px);"></div>
+        </section>
+
+        <!-- Ad Banner -->
+        <section class="py-12">
+            <div id="ad-banner" class="container hidden">
+                <!-- Ad will be rendered here -->
+            </div>
+        </section>
+    
+        <!-- Product Section -->
+        <section id="product" class="py-16">
+            <div class="container">
+                <h2 class="text-3xl font-bold text-center mb-12">Produk Kami</h2>
+                
+                <!-- Category Tabs -->
+                <div class="flex justify-center space-x-4 mb-8">
+                    <button class="px-4 py-2 rounded-full bg-gray-700 hover:bg-yellow-500 text-white hover:text-gray-900 transition-colors" onclick="renderProducts()">Semua</button>
+                    <button class="px-4 py-2 rounded-full bg-gray-700 hover:bg-yellow-500 text-white hover:text-gray-900 transition-colors" onclick="renderProducts('Steam')">Steam</button>
+                    <button class="px-4 py-2 rounded-full bg-gray-700 hover:bg-yellow-500 text-white hover:text-gray-900 transition-colors" onclick="renderProducts('Roblox')">Roblox</button>
+                </div>
+
+                <!-- Product List -->
+                <div id="product-list" class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-8">
+                    <!-- Products will be rendered here -->
+                </div>
+            </div>
+        </section>
+
+        <!-- About Us Section -->
+        <section id="info" class="bg-gray-800 py-16">
+            <div class="container text-center">
+                <h2 class="text-3xl font-bold mb-4">Tentang Kami</h2>
+                <p class="text-gray-400 max-w-2xl mx-auto">KingzStore adalah toko online terpercaya yang menjual berbagai akun game. Kami berkomitmen untuk menyediakan akun dengan kualitas terbaik, harga kompetitif, dan layanan pelanggan yang responsif.</p>
+            </div>
+        </section>
+        
+        <!-- Contact Section -->
+        <section id="contact" class="py-16">
+            <div class="container text-center">
+                <h2 class="text-3xl font-bold mb-4">Hubungi Kami</h2>
+                <p class="text-gray-400 max-w-2xl mx-auto mb-6">Jika Anda memiliki pertanyaan atau butuh bantuan, jangan ragu untuk menghubungi kami melalui WhatsApp atau media sosial.</p>
+                <a href="https://wa.me/6281944589876" target="_blank" class="btn btn-primary text-lg">Hubungi via WhatsApp</a>
+            </div>
+        </section>
+    </div>
+
+    <!-- Admin Panel -->
+    <div id="admin-panel" class="hidden pt-24 min-h-screen">
+        <div class="container">
+            <h1 class="text-4xl font-bold text-white mb-6">Admin Panel</h1>
+            <div class="flex border-b border-gray-700 mb-8">
+                <button class="admin-tab-btn border-b-2 border-yellow-500" data-target="dashboard-content">Dashboard</button>
+                <button class="admin-tab-btn" data-target="products-content">Produk</button>
+                <button class="admin-tab-btn" data-target="orders-content">Pesanan</button>
+                <button class="admin-tab-btn" data-target="accounts-content">Akun</button>
+                <button class="admin-tab-btn" data-target="ads-content">Iklan</button>
+                <button class="admin-tab-btn" data-target="admins-content">Admin</button>
+            </div>
+
+            <!-- Dashboard Content -->
+            <div id="dashboard-content" class="admin-tab-content">
+                <h2 class="text-2xl font-semibold mb-4">Dashboard Analitik</h2>
+                <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
+                    <!-- Sales Summary -->
+                    <div class="bg-gray-800 p-6 rounded-xl shadow-lg">
+                        <h3 class="text-xl font-bold mb-2">Penjualan Harian</h3>
+                        <p class="text-yellow-500 text-3xl font-bold">Rp 0</p>
+                    </div>
+                    <div class="bg-gray-800 p-6 rounded-xl shadow-lg">
+                        <h3 class="text-xl font-bold mb-2">Penjualan Mingguan</h3>
+                        <p class="text-yellow-500 text-3xl font-bold">Rp 0</p>
+                    </div>
+                    <div class="bg-gray-800 p-6 rounded-xl shadow-lg">
+                        <h3 class="text-xl font-bold mb-2">Total Pesanan</h3>
+                        <p id="total-orders" class="text-yellow-500 text-3xl font-bold">0</p>
+                    </div>
+                    <div class="bg-gray-800 p-6 rounded-xl shadow-lg">
+                        <h3 class="text-xl font-bold mb-2">Total Akun Tersedia</h3>
+                        <p id="available-accounts" class="text-yellow-500 text-3xl font-bold">0</p>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Products Content -->
+            <div id="products-content" class="admin-tab-content hidden">
+                <h2 class="text-2xl font-semibold mb-4">Manajemen Produk</h2>
+                <div class="bg-gray-800 p-6 rounded-xl shadow-lg mb-8">
+                    <h3 class="text-xl font-semibold mb-4">Tambah Produk Baru</h3>
+                    <form id="add-product-form" class="space-y-4">
+                        <input type="text" id="product-name" name="name" placeholder="Nama Produk" class="input-field" required>
+                        <select name="category" class="input-field" required>
+                            <option value="">Pilih Kategori</option>
+                            <option value="Steam">Steam</option>
+                            <option value="Roblox">Roblox</option>
+                        </select>
+                        <input type="text" id="product-price" name="price" placeholder="Harga (contoh: Rp 150.000)" class="input-field" required>
+                        <input type="number" id="product-discount" name="discount" placeholder="Diskon (%) (opsional)" class="input-field">
+                        <input type="url" id="product-image-url" name="imageUrl" placeholder="URL Gambar Produk" class="input-field" required>
+                        <textarea id="product-description" name="description" placeholder="Deskripsi (pisahkan dengan koma)" class="input-field" required></textarea>
+                        <button type="submit" class="w-full btn btn-primary">Tambah Produk</button>
+                    </form>
+                </div>
+                <div class="bg-gray-800 p-6 rounded-xl shadow-lg">
+                    <h3 class="text-xl font-semibold mb-4">Daftar Produk</h3>
+                    <div class="overflow-x-auto">
+                        <table class="min-w-full divide-y divide-gray-700">
+                            <thead class="bg-gray-700">
+                                <tr>
+                                    <th scope="col" class="px-6 py-3 text-left text-xs font-medium text-gray-400 uppercase tracking-wider">Nama Produk</th>
+                                    <th scope="col" class="px-6 py-3 text-left text-xs font-medium text-gray-400 uppercase tracking-wider">Harga</th>
+                                    <th scope="col" class="px-6 py-3 text-left text-xs font-medium text-gray-400 uppercase tracking-wider">Diskon</th>
+                                    <th scope="col" class="relative px-6 py-3"><span class="sr-only">Aksi</span></th>
+                                </tr>
+                            </thead>
+                            <tbody id="admin-products-list" class="bg-gray-800 divide-y divide-gray-700">
+                                <!-- Products will be rendered here -->
+                            </tbody>
+                        </table>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Orders Content -->
+            <div id="orders-content" class="admin-tab-content hidden">
+                <h2 class="text-2xl font-semibold mb-4">Manajemen Pesanan</h2>
+                <div class="bg-gray-800 p-6 rounded-xl shadow-lg">
+                    <h3 class="text-xl font-semibold mb-4">Daftar Pesanan</h3>
+                    <div class="overflow-x-auto">
+                        <table class="min-w-full divide-y divide-gray-700">
+                            <thead class="bg-gray-700">
+                                <tr>
+                                    <th scope="col" class="px-6 py-3 text-left text-xs font-medium text-gray-400 uppercase tracking-wider">ID Pesanan</th>
+                                    <th scope="col" class="px-6 py-3 text-left text-xs font-medium text-gray-400 uppercase tracking-wider">Nama Produk</th>
+                                    <th scope="col" class="px-6 py-3 text-left text-xs font-medium text-gray-400 uppercase tracking-wider">Harga</th>
+                                    <th scope="col" class="px-6 py-3 text-left text-xs font-medium text-gray-400 uppercase tracking-wider">Status</th>
+                                    <th scope="col" class="relative px-6 py-3"><span class="sr-only">Aksi</span></th>
+                                </tr>
+                            </thead>
+                            <tbody id="admin-orders-list" class="bg-gray-800 divide-y divide-gray-700">
+                                <!-- Orders will be rendered here -->
+                            </tbody>
+                        </table>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Accounts Content -->
+            <div id="accounts-content" class="admin-tab-content hidden">
+                <h2 class="text-2xl font-semibold mb-4">Manajemen Akun</h2>
+                <div class="bg-gray-800 p-6 rounded-xl shadow-lg mb-8">
+                    <h3 class="text-xl font-semibold mb-4">Tambah Akun Baru</h3>
+                    <form id="add-account-form" class="space-y-4">
+                        <input type="text" id="account-product-id" name="productId" placeholder="ID Produk (misal: S123)" class="input-field" required>
+                        <input type="text" id="account-username" name="username" placeholder="Username Akun" class="input-field" required>
+                        <input type="text" id="account-password" name="password" placeholder="Password Akun" class="input-field" required>
+                        <button type="submit" class="w-full btn btn-primary">Tambah Akun</button>
+                    </form>
+                </div>
+                <div class="bg-gray-800 p-6 rounded-xl shadow-lg">
+                    <h3 class="text-xl font-semibold mb-4">Daftar Akun Tersedia</h3>
+                    <div class="overflow-x-auto">
+                        <table class="min-w-full divide-y divide-gray-700">
+                            <thead class="bg-gray-700">
+                                <tr>
+                                    <th scope="col" class="px-6 py-3 text-left text-xs font-medium text-gray-400 uppercase tracking-wider">Username</th>
+                                    <th scope="col" class="px-6 py-3 text-left text-xs font-medium text-gray-400 uppercase tracking-wider">ID Produk</th>
+                                    <th scope="col" class="px-6 py-3 text-left text-xs font-medium text-gray-400 uppercase tracking-wider">Status</th>
+                                    <th scope="col" class="relative px-6 py-3"><span class="sr-only">Aksi</span></th>
+                                </tr>
+                            </thead>
+                            <tbody id="admin-accounts-list" class="bg-gray-800 divide-y divide-gray-700">
+                                <!-- Accounts will be rendered here -->
+                            </tbody>
+                        </table>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Ads Content -->
+            <div id="ads-content" class="admin-tab-content hidden">
+                <h2 class="text-2xl font-semibold mb-4">Manajemen Iklan</h2>
+                <div class="bg-gray-800 p-6 rounded-xl shadow-lg mb-8">
+                    <h3 class="text-xl font-semibold mb-4">Tambah Iklan Baru</h3>
+                    <form id="add-ad-form" class="space-y-4">
+                        <input type="url" id="ad-image-url" name="imageUrl" placeholder="URL Gambar Iklan" class="input-field" required>
+                        <input type="text" id="ad-description" name="description" placeholder="Deskripsi Iklan" class="input-field" required>
+                        <button type="submit" class="w-full btn btn-primary">Tambah Iklan</button>
+                    </form>
+                </div>
+                <div class="bg-gray-800 p-6 rounded-xl shadow-lg">
+                    <h3 class="text-xl font-semibold mb-4">Daftar Iklan</h3>
+                    <div class="overflow-x-auto">
+                        <table class="min-w-full divide-y divide-gray-700">
+                            <thead class="bg-gray-700">
+                                <tr>
+                                    <th scope="col" class="px-6 py-3 text-left text-xs font-medium text-gray-400 uppercase tracking-wider">Deskripsi</th>
+                                    <th scope="col" class="px-6 py-3 text-left text-xs font-medium text-gray-400 uppercase tracking-wider">URL Gambar</th>
+                                    <th scope="col" class="relative px-6 py-3"><span class="sr-only">Aksi</span></th>
+                                </tr>
+                            </thead>
+                            <tbody id="admin-ads-list" class="bg-gray-800 divide-y divide-gray-700">
+                                <!-- Ads will be rendered here -->
+                            </tbody>
+                        </table>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Admins Content -->
+            <div id="admins-content" class="admin-tab-content hidden">
+                <h2 class="text-2xl font-semibold mb-4">Manajemen Admin</h2>
+                <div class="bg-gray-800 p-6 rounded-xl shadow-lg mb-8">
+                    <h3 class="text-xl font-semibold mb-4">Tambah Admin Baru</h3>
+                    <form id="add-admin-form" class="space-y-4">
+                        <input type="email" name="adminEmail" placeholder="Email Admin" class="input-field" required>
+                        <input type="password" name="adminPassword" placeholder="Password Admin" class="input-field" required>
+                        <button type="submit" class="w-full btn btn-primary">Tambah Admin</button>
+                    </form>
+                </div>
+                <div class="bg-gray-800 p-6 rounded-xl shadow-lg">
+                    <h3 class="text-xl font-semibold mb-4">Daftar Admin</h3>
+                    <div class="overflow-x-auto">
+                        <table class="min-w-full divide-y divide-gray-700">
+                            <thead class="bg-gray-700">
+                                <tr>
+                                    <th scope="col" class="px-6 py-3 text-left text-xs font-medium text-gray-400 uppercase tracking-wider">Email</th>
+                                    <th scope="col" class="px-6 py-3 text-left text-xs font-medium text-gray-400 uppercase tracking-wider">Ditambahkan Oleh</th>
+                                    <th scope="col" class="relative px-6 py-3"><span class="sr-only">Aksi</span></th>
+                                </tr>
+                            </thead>
+                            <tbody id="admin-admins-list" class="bg-gray-800 divide-y divide-gray-700">
+                                <!-- Admins will be rendered here -->
+                            </tbody>
+                        </table>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Login Modal -->
+    <div id="login-modal" class="modal-overlay fixed inset-0 z-50 flex items-center justify-center hidden">
+        <div class="modal-content bg-gray-800 p-8 rounded-xl shadow-2xl max-w-sm w-full relative">
+            <h3 class="text-2xl font-bold text-white mb-4 text-center">Login Admin</h3>
+            <form id="login-form" class="space-y-4">
+                <input type="email" id="login-email" placeholder="Email" class="input-field" required>
+                <input type="password" id="login-password" placeholder="Password" class="input-field" required>
+                <button type="submit" class="w-full btn btn-primary">Masuk</button>
+                <p id="login-status" class="text-center text-red-400 text-sm"></p>
+            </form>
+            <button id="close-login-modal" class="absolute top-4 right-4 text-gray-400 hover:text-white">
+                <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg">
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"></path>
+                </svg>
+            </button>
+        </div>
+    </div>
+
+    <!-- Order Confirmation Modal -->
+    <div id="order-modal" class="modal-overlay fixed inset-0 z-50 flex items-center justify-center hidden">
+        <div class="modal-content p-8 rounded-xl shadow-2xl text-center max-w-sm w-full">
+            <h3 class="text-xl font-bold text-gray-900 mb-4">Konfirmasi Pesanan</h3>
+            <p class="text-gray-600 mb-6">Anda akan diarahkan ke WhatsApp untuk menyelesaikan pembelian.</p>
+            <div class="flex justify-center space-x-4">
+                <button id="cancel-order-btn" class="btn btn-secondary">Batal</button>
+                <button id="confirm-order-btn" class="btn btn-primary">Ya, Pesan Sekarang</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- Info Modal -->
+    <div id="info-modal" class="modal-overlay fixed inset-0 z-50 flex items-center justify-center hidden">
+        <div class="modal-content p-8 rounded-xl shadow-2xl text-center max-w-sm w-full">
+            <h3 class="text-xl font-bold text-white mb-4">Informasi</h3>
+            <p id="info-message" class="text-gray-400 mb-6"></p>
+            <button id="close-info-modal" class="btn btn-primary">Tutup</button>
+        </div>
+    </div>
+    
+    <!-- Footer -->
+    <footer class="bg-gray-950 text-gray-400 py-8 mt-auto">
+        <div class="container text-center">
+            <p>&copy; 2024 KingzStore. Semua hak dilindungi.</p>
+            <div class="mt-4 flex justify-center space-x-4">
+                <a href="#" class="hover:text-yellow-500">Kebijakan Privasi</a>
+                <span class="text-gray-600">|</span>
+                <a href="#" class="hover:text-yellow-500">Syarat dan Ketentuan</a>
+            </div>
+        </div>
+    </footer>
 </body>
 </html>
