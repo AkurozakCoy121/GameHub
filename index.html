@@ -459,7 +459,7 @@
     <script type="module">
         import { initializeApp } from "https://www.gstatic.com/firebasejs/10.12.3/firebase-app.js";
         import { getAuth, signInWithEmailAndPassword, createUserWithEmailAndPassword, onAuthStateChanged, signOut, setPersistence, browserSessionPersistence } from "https://www.gstatic.com/firebasejs/10.12.3/firebase-auth.js";
-        import { getFirestore, collection, doc, getDoc, getDocs, addDoc, setDoc, updateDoc, deleteDoc, onSnapshot, query, where, serverTimestamp } from "https://www.gstatic.com/firebasejs/10.12.3/firebase-firestore.js";
+        import { getFirestore, collection, doc, getDoc, getDocs, addDoc, setDoc, updateDoc, deleteDoc, onSnapshot, query, where, serverTimestamp, orderBy } from "https://www.gstatic.com/firebasejs/10.12.3/firebase-firestore.js";
 
         // Firebase config
         const firebaseConfig = {
@@ -951,18 +951,19 @@
                         if (userData.role === 'admin') {
                             isAdmin = true;
                             navBtns.admin.classList.remove('hidden');
-                            // Load admin specific data
+                            // Panggil semua fungsi admin di sini setelah peran dikonfirmasi
                             loadAdminChats();
+                            loadAdminStats();
+                            loadAdminProducts();
+                            loadAdminOrders();
+                            loadAdminUsers();
                         } else {
                             isAdmin = false;
                             navBtns.admin.classList.add('hidden');
                         }
-                    }
-                    if (isAdmin) {
-                        loadAdminStats();
-                        loadAdminProducts();
-                        loadAdminOrders();
-                        loadAdminUsers();
+                    } else {
+                       isAdmin = false;
+                       navBtns.admin.classList.add('hidden');
                     }
                 } catch (e) {
                     console.error("Error getting user role:", e);
