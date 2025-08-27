@@ -60,6 +60,43 @@
         .sidebar-link {
             @apply flex items-center p-3 rounded-lg hover:bg-gray-100 transition-colors;
         }
+
+        /* Perbaikan UI dan menambahkan animasi */
+        .card-animate {
+            transform: translateY(0);
+            transition: transform 0.5s ease-out;
+        }
+        .card-animate:hover {
+            transform: translateY(-5px);
+        }
+        .pulse-animation {
+            animation: pulse-ring 1.5s cubic-bezier(0.2, 0, 0, 1) infinite;
+        }
+        @keyframes pulse-ring {
+            0% { transform: scale(0.33); }
+            80%, 100% { opacity: 0; }
+        }
+        .chat-user-item {
+            @apply p-3 rounded-lg cursor-pointer transition-colors duration-200;
+        }
+        .chat-user-item:hover {
+            @apply bg-gray-100;
+        }
+        .chat-user-item.active {
+            @apply bg-blue-500 text-white;
+        }
+        .chat-user-item.active .text-gray-500 {
+            @apply text-blue-200;
+        }
+        .chat-message {
+            @apply p-3 rounded-lg shadow-sm;
+        }
+        .chat-message.self {
+            @apply bg-blue-500 text-white self-end rounded-br-none;
+        }
+        .chat-message.other {
+            @apply bg-gray-200 text-gray-800 self-start rounded-bl-none;
+        }
     </style>
 </head>
 <body>
@@ -70,6 +107,21 @@
             <h3 id="modal-title" class="text-2xl font-bold mb-4"></h3>
             <p id="modal-message" class="text-gray-600 mb-6"></p>
             <button id="modal-close-btn" class="btn-primary">Tutup</button>
+        </div>
+    </div>
+    
+    <!-- Modal Konfirmasi Pembayaran -->
+    <div id="payment-success-modal" class="modal hidden">
+        <div class="modal-content">
+            <h3 class="text-2xl font-bold text-green-600 mb-4 text-center">Pembayaran Berhasil!</h3>
+            <div id="payment-success-content" class="text-gray-800 text-center space-y-4">
+                <p>Selamat! Akun Anda telah berhasil dikirim. Silakan salin teks di bawah ini.</p>
+                <div class="bg-gray-100 border border-gray-300 p-4 rounded-lg shadow-inner">
+                    <pre id="payment-success-text" class="whitespace-pre-wrap font-mono text-left"></pre>
+                </div>
+                <button id="copy-account-text-btn" class="btn-primary w-full">Salin Teks Akun</button>
+                <button id="payment-success-close-btn" class="btn-secondary w-full">Tutup</button>
+            </div>
         </div>
     </div>
 
@@ -203,7 +255,7 @@
                 </div>
                 <!-- Chat window -->
                 <div id="chat-window" class="flex-grow bg-white rounded-2xl shadow-lg flex flex-col overflow-hidden border border-gray-200">
-                    <div id="chat-messages" class="flex-grow p-4 overflow-y-auto space-y-4">
+                    <div id="chat-messages" class="flex-grow p-4 overflow-y-auto flex flex-col space-y-4">
                         <!-- Messages will be injected here -->
                     </div>
                     <form id="chat-form" class="p-4 border-t border-gray-200 flex items-center space-x-2 bg-gray-50">
@@ -375,7 +427,6 @@
             </form>
         </div>
     </div>
-    
     <!-- Modal Add User -->
     <div id="add-user-modal" class="modal hidden">
         <div class="modal-content">
@@ -404,7 +455,6 @@
         </div>
     </div>
 
-
     <!-- Firebase JS SDK -->
     <script type="module">
         import { initializeApp } from "https://www.gstatic.com/firebasejs/10.12.3/firebase-app.js";
@@ -413,21 +463,21 @@
 
         // Firebase config
         const firebaseConfig = {
-          apiKey: "AIzaSyAlGXpZSyQab7riDteV5ppS3DXDJQHywKw",
-          authDomain: "modmanagerpro-248f5.firebaseapp.com",
-          projectId: "modmanagerpro-248f5",
-          storageBucket: "modmanagerpro-248f5.firebasestorage.app",
-          messagingSenderId: "594650288669",
-          appId: "1:594650288669:web:9d19cb5ebed778b6f1ecf4",
-          measurementId: "G-XM4V5F6PQC"
+            apiKey: "AIzaSyAlGXpZSyQab7riDteV5ppS3DXDJQHywKw",
+            authDomain: "modmanagerpro-248f5.firebaseapp.com",
+            projectId: "modmanagerpro-248f5",
+            storageBucket: "modmanagerpro-248f5.firebasestorage.app",
+            messagingSenderId: "594650288669",
+            appId: "1:594650288669:web:9d19cb5ebed778b6f1ecf4",
+            measurementId: "G-XM4V5F6PQC"
         };
-        
+
         // Initialize Firebase
         const app = initializeApp(firebaseConfig);
         const auth = getAuth(app);
         const db = getFirestore(app);
 
-        // UI Elements
+        // Global variables for UI elements and state
         const pages = ['home-page', 'product-list-page', 'product-detail-page', 'auth-page', 'chat-page', 'admin-panel'];
         const navBtns = {
             home: document.getElementById('nav-btn-home'),
@@ -437,787 +487,526 @@
             admin: document.getElementById('nav-btn-admin'),
             logout: document.getElementById('nav-btn-logout')
         };
-        const customModal = document.getElementById('custom-modal');
-        const modalTitle = document.getElementById('modal-title');
-        const modalMessage = document.getElementById('modal-message');
-        const adModal = document.getElementById('ad-modal');
-        const adminEmail = "ojakgamteng62@gmail.com";
-
-        let currentProduct = null;
         let currentUser = null;
         let isAdmin = false;
-        let isUserBanned = false;
 
-        // Custom Modal Function
-        function showCustomModal(title, message) {
-            modalTitle.textContent = title;
-            modalMessage.textContent = message;
-            customModal.classList.remove('hidden');
+        const adminSections = {
+            dashboard: document.getElementById('admin-dashboard-section'),
+            products: document.getElementById('admin-products-section'),
+            orders: document.getElementById('admin-orders-section'),
+            users: document.getElementById('admin-users-section'),
+            ads: document.getElementById('admin-ads-section'),
+            logs: document.getElementById('admin-logs-section'),
+        };
+
+        let currentActiveChat = null;
+        let unsubscribeChat = null;
+
+        // --- Perbaikan Fungsionalitas ---
+
+        // Fungsi untuk menampilkan modal notifikasi kustom
+        function showCustomModal(title, message, callback = null) {
+            const modal = document.getElementById('custom-modal');
+            document.getElementById('modal-title').innerText = title;
+            document.getElementById('modal-message').innerText = message;
+            modal.classList.remove('hidden');
+
+            const closeBtn = document.getElementById('modal-close-btn');
+            closeBtn.onclick = () => {
+                modal.classList.add('hidden');
+                if (callback) callback();
+            };
         }
+        
+        // Fungsi untuk menampilkan modal pembayaran berhasil
+        function showPaymentSuccessModal(accountText) {
+            const modal = document.getElementById('payment-success-modal');
+            document.getElementById('payment-success-text').innerText = accountText;
+            modal.classList.remove('hidden');
 
-        function hideCustomModal() {
-            customModal.classList.add('hidden');
-        }
-
-        document.getElementById('modal-close-btn').addEventListener('click', hideCustomModal);
-
-        // Page Navigation
-        function showPage(pageId) {
-            pages.forEach(id => {
-                const element = document.getElementById(id);
-                if (element) {
-                    element.classList.add('hidden');
-                }
-            });
-            const pageElement = document.getElementById(pageId);
-            if (pageElement) {
-                pageElement.classList.remove('hidden');
-            }
-            if (pageId === 'admin-panel') {
-                showAdminPage('dashboard');
-            }
-        }
-
-        // Firebase Authentication State
-        onAuthStateChanged(auth, async (user) => {
-            currentUser = user;
-            isAdmin = user && user.email === adminEmail;
-            isUserBanned = false; // Reset ban status
-
-            if (user) {
-                const userDoc = await getDoc(doc(db, "users", user.uid));
-                if (userDoc.exists() && userDoc.data().isBanned) {
-                    isUserBanned = true;
-                    await signOut(auth);
-                    showCustomModal('Akun Diblokir', 'Akun Anda telah diblokir. Silakan hubungi admin untuk informasi lebih lanjut.');
-                    return;
-                }
-
-                navBtns.login.classList.add('hidden');
-                navBtns.logout.classList.remove('hidden');
-                navBtns.admin.classList.toggle('hidden', !isAdmin);
-            } else {
-                navBtns.login.classList.remove('hidden');
-                navBtns.logout.classList.add('hidden');
-                navBtns.admin.classList.add('hidden');
-            }
-
-            // Always start on home page and load ads/products
-            showPage('home-page');
-            loadAds();
-            loadProducts();
-            if (currentUser && !isAdmin) {
-                setupUserChat();
-            } else if (isAdmin) {
-                setupAdminChat();
-            }
-        });
-
-        // --- Ad Management (User Side) ---
-        async function loadAds() {
-            const docRef = doc(db, "settings", "ads");
-            const docSnap = await getDoc(docRef);
-            if (docSnap.exists()) {
-                const ad = docSnap.data();
-                if (ad.active) {
-                    const adContentDiv = document.getElementById('ad-content');
-                    if (ad.type === 'image' && ad.value) {
-                        adContentDiv.innerHTML = `<img src="${ad.value}" alt="Ad" class="w-full h-auto rounded-xl">`;
-                    } else if (ad.type === 'text' && ad.value) {
-                        adContentDiv.innerHTML = `<p class="text-lg font-semibold">${ad.value}</p>`;
-                    }
-                    adModal.classList.remove('hidden');
-                }
-            }
-        }
-        document.getElementById('ad-close-btn').addEventListener('click', () => adModal.classList.add('hidden'));
-
-        // --- Product Listing (User Side) ---
-        let allProducts = [];
-        const productsContainer = document.getElementById('products-container');
-
-        async function loadProducts() {
-            onSnapshot(collection(db, "products"), (snapshot) => {
-                const productsData = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
-                allProducts = productsData.filter(p => p.visible);
-                displayProducts();
-            });
-        }
-
-        function displayProducts(filtered = allProducts) {
-            productsContainer.innerHTML = '';
-            filtered.forEach(product => {
-                let priceHtml = `<p class="text-xl font-bold text-green-600">Rp ${product.price.toLocaleString('id-ID')}</p>`;
-                if (product.discountPercent > 0) {
-                    const discountedPrice = product.price * (1 - product.discountPercent / 100);
-                    priceHtml = `
-                        <p class="text-sm text-gray-500 line-through">Rp ${product.price.toLocaleString('id-ID')}</p>
-                        <p class="text-xl font-bold text-green-600">Rp ${discountedPrice.toLocaleString('id-ID')}</p>
-                    `;
-                }
-                
-                const hasStock = (product.stock && product.stock > 0);
-                const buyBtnClass = hasStock ? 'btn-primary' : 'bg-gray-400 cursor-not-allowed text-white font-semibold py-3 px-6 rounded-xl shadow-md';
-                const buyBtnText = hasStock ? 'Beli Sekarang' : 'Stok Habis';
-
-                const productCard = document.createElement('div');
-                productCard.className = 'product-card';
-                productCard.innerHTML = `
-                    <img src="${product.imageUrl || 'https://placehold.co/400x250/E0E0E0/gray?text=No+Image'}" alt="${product.title}" class="w-full h-48 object-cover rounded-t-2xl">
-                    <div class="p-4">
-                        <div class="flex items-center justify-between mb-2">
-                            <h3 class="text-lg font-bold truncate">${product.title}</h3>
-                            ${product.discountPercent > 0 ? `<span class="badge bg-red-500 text-white">${product.discountPercent}%</span>` : ''}
-                        </div>
-                        <div class="flex items-center space-x-2 text-gray-600 text-sm mb-2">
-                            <span class="bg-gray-200 px-2 py-1 rounded-full text-xs font-semibold">${product.platform}</span>
-                            <span class="bg-gray-200 px-2 py-1 rounded-full text-xs font-semibold">Stok: ${product.stock}</span>
-                        </div>
-                        ${priceHtml}
-                        <button class="${buyBtnClass} w-full mt-4" data-id="${product.id}" ${!hasStock ? 'disabled' : ''}>${buyBtnText}</button>
-                    </div>
-                `;
-                productCard.querySelector('button').addEventListener('click', (e) => showProductDetail(e.target.dataset.id));
-                productCard.addEventListener('click', (e) => {
-                    if (e.target.tagName !== 'BUTTON') {
-                        showProductDetail(product.id);
-                    }
-                });
-                productsContainer.appendChild(productCard);
-            });
-        }
-
-        document.getElementById('search-input').addEventListener('input', (e) => {
-            const searchTerm = e.target.value.toLowerCase();
-            const filtered = allProducts.filter(p => p.title.toLowerCase().includes(searchTerm));
-            displayProducts(filtered);
-        });
-        document.getElementById('filter-all').addEventListener('click', () => displayProducts());
-        document.getElementById('filter-steam').addEventListener('click', () => displayProducts(allProducts.filter(p => p.platform === 'Steam')));
-        document.getElementById('filter-roblox').addEventListener('click', () => displayProducts(allProducts.filter(p => p.platform === 'Roblox')));
-
-        // --- Product Detail & Buy Now ---
-        async function showProductDetail(productId) {
-            const productRef = doc(db, "products", productId);
-            const productSnap = await getDoc(productRef);
-            if (productSnap.exists()) {
-                currentProduct = { id: productSnap.id, ...productSnap.data() };
-                document.getElementById('product-detail-title').textContent = currentProduct.title;
-                document.getElementById('product-detail-platform').textContent = currentProduct.platform;
-                
-                const hasStock = currentProduct.stock > 0;
-                document.getElementById('product-detail-stock').textContent = `Stok: ${currentProduct.stock}`;
-                document.getElementById('product-detail-stock').classList.toggle('bg-yellow-100', hasStock);
-                document.getElementById('product-detail-stock').classList.toggle('text-yellow-800', hasStock);
-                document.getElementById('product-detail-stock').classList.toggle('bg-red-100', !hasStock);
-                document.getElementById('product-detail-stock').classList.toggle('text-red-800', !hasStock);
-                
-                document.getElementById('product-detail-description').textContent = currentProduct.description;
-                document.getElementById('product-detail-image').src = currentProduct.imageUrl || 'https://placehold.co/400x250/E0E0E0/gray?text=No+Image';
-
-                let finalPrice = currentProduct.price;
-                if (currentProduct.discountPercent > 0) {
-                    finalPrice = currentProduct.price * (1 - currentProduct.discountPercent / 100);
-                    document.getElementById('product-detail-discount-price').textContent = `Rp ${currentProduct.price.toLocaleString('id-ID')}`;
-                    document.getElementById('product-detail-discount-percent').textContent = `${currentProduct.discountPercent}% OFF`;
-                } else {
-                    document.getElementById('product-detail-discount-price').textContent = '';
-                    document.getElementById('product-detail-discount-percent').textContent = '';
-                }
-                document.getElementById('product-detail-price').textContent = `Rp ${finalPrice.toLocaleString('id-ID')}`;
-                
-                const buyBtn = document.getElementById('buy-now-btn');
-                if (hasStock) {
-                    buyBtn.textContent = 'Beli Sekarang';
-                    buyBtn.disabled = false;
-                    buyBtn.classList.replace('bg-gray-400', 'bg-blue-600');
-                    buyBtn.classList.replace('hover:bg-gray-500', 'hover:bg-blue-700');
-                } else {
-                    buyBtn.textContent = 'Stok Habis';
-                    buyBtn.disabled = true;
-                    buyBtn.classList.replace('bg-blue-600', 'bg-gray-400');
-                    buyBtn.classList.replace('hover:bg-blue-700', 'hover:bg-gray-500');
-                }
-                
-                showPage('product-detail-page');
-            } else {
-                showCustomModal('Error', 'Produk tidak ditemukan.');
-            }
-        }
-        document.getElementById('buy-now-btn').addEventListener('click', async () => {
-            if (!currentUser) {
-                return showCustomModal('Peringatan', 'Anda harus login untuk membeli produk.');
-            }
-            if (!currentProduct || currentProduct.stock <= 0) {
-                return showCustomModal('Peringatan', 'Maaf, stok produk ini habis.');
-            }
-
-            const orderData = {
-                userId: currentUser.uid,
-                productId: currentProduct.id,
-                pricePaid: currentProduct.price,
-                status: 'pending',
-                productSnapshot: {
-                    title: currentProduct.title,
-                    price: currentProduct.price
-                },
-                createdAt: serverTimestamp()
+            const closeBtn = document.getElementById('payment-success-close-btn');
+            closeBtn.onclick = () => {
+                modal.classList.add('hidden');
+                history.replaceState(null, '', location.pathname); // Menghapus parameter dari URL
             };
 
-            try {
-                const orderRef = await addDoc(collection(db, "orders"), orderData);
-                await updateDoc(doc(db, "products", currentProduct.id), {
-                    stock: Math.max(0, currentProduct.stock - 1)
-                });
-                
-                const templateMessage = `Halo KingzzStore, saya mau beli:%0A${currentProduct.title}%0AUsername: ${currentUser.email}%0AID Pesanan: ${orderRef.id}`;
-                window.open(`https://wa.me/6281944589876?text=${templateMessage}`, '_blank');
-                
-                showCustomModal('Pesanan Dibuat', 'Pesanan Anda telah dialihkan ke WhatsApp. Silakan lanjutkan komunikasi di sana. Terima kasih!');
-            } catch (error) {
-                showCustomModal('Gagal', 'Terjadi kesalahan saat membuat pesanan: ' + error.message);
-            }
-        });
-
-        // --- Auth Functions ---
-        const authForm = document.getElementById('auth-form');
-        const authEmailInput = document.getElementById('auth-email');
-        const authPasswordInput = document.getElementById('auth-password');
-        const authTitle = document.getElementById('auth-title');
-        const authSwitch = document.getElementById('auth-switch');
-        let isLogin = true;
-
-        authForm.addEventListener('submit', async (e) => {
-            e.preventDefault();
-            const email = authEmailInput.value;
-            const password = authPasswordInput.value;
-
-            try {
-                if (isLogin) {
-                    await setPersistence(auth, browserSessionPersistence);
-                    await signInWithEmailAndPassword(auth, email, password);
-                    showCustomModal('Login Berhasil', 'Anda telah berhasil login.');
-                } else {
-                    const userCredential = await createUserWithEmailAndPassword(auth, email, password);
-                    await setDoc(doc(db, "users", userCredential.user.uid), {
-                        email: email,
-                        createdAt: serverTimestamp(),
-                        role: "user",
-                        isBanned: false
-                    });
-                    showCustomModal('Registrasi Berhasil', 'Akun Anda berhasil dibuat. Silakan login.');
+            const copyBtn = document.getElementById('copy-account-text-btn');
+            copyBtn.onclick = () => {
+                const textToCopy = document.getElementById('payment-success-text').innerText;
+                const textarea = document.createElement('textarea');
+                textarea.value = textToCopy;
+                document.body.appendChild(textarea);
+                textarea.select();
+                try {
+                    document.execCommand('copy');
+                    showCustomModal('Berhasil!', 'Teks akun berhasil disalin ke clipboard.');
+                } catch (err) {
+                    showCustomModal('Gagal!', 'Gagal menyalin teks. Silakan salin manual.');
                 }
-            } catch (error) {
-                showCustomModal('Error', error.message);
-            }
-        });
-
-        document.getElementById('switch-to-register').addEventListener('click', (e) => {
-            e.preventDefault();
-            isLogin = false;
-            authTitle.textContent = 'Daftar';
-            authSwitch.innerHTML = 'Sudah punya akun? <a href="#" id="switch-to-login" class="text-blue-600 hover:underline font-semibold">Login di sini</a>';
-            document.getElementById('switch-to-login').addEventListener('click', (e) => {
-                e.preventDefault();
-                isLogin = true;
-                authTitle.textContent = 'Login';
-                authSwitch.innerHTML = 'Belum punya akun? <a href="#" id="switch-to-register" class="text-blue-600 hover:underline font-semibold">Daftar sekarang</a>';
-                document.getElementById('switch-to-register').addEventListener('click', (e) => {
-                    e.preventDefault();
-                    isLogin = false;
-                    authTitle.textContent = 'Daftar';
-                    authSwitch.innerHTML = 'Sudah punya akun? <a href="#" id="switch-to-login" class="text-blue-600 hover:underline font-semibold">Login di sini</a>';
-                });
-            });
-        });
-
-        // --- User Chat Functionality ---
-        let currentChatUserUid = null;
-        const chatMessagesDiv = document.getElementById('chat-messages');
-
-        function setupUserChat() {
-            if (!currentUser) return;
-            showPage('chat-page');
-            const chatRef = collection(db, `chats/${currentUser.uid}/messages`);
-            const chatQuery = query(chatRef);
-            onSnapshot(chatQuery, (snapshot) => {
-                chatMessagesDiv.innerHTML = '';
-                snapshot.docs.sort((a,b) => a.data().createdAt?.toDate() - b.data().createdAt?.toDate()).forEach(doc => {
-                    const msg = doc.data();
-                    const messageClass = msg.from === currentUser.uid ? 'bg-blue-100 self-end' : 'bg-gray-200 self-start';
-                    const messageDiv = document.createElement('div');
-                    messageDiv.className = `p-3 rounded-lg max-w-[80%] ${messageClass}`;
-                    messageDiv.textContent = msg.text;
-                    chatMessagesDiv.appendChild(messageDiv);
-                });
-                chatMessagesDiv.scrollTop = chatMessagesDiv.scrollHeight;
-            });
+                document.body.removeChild(textarea);
+            };
         }
 
-        // --- Admin Chat Functionality ---
-        let activeAdminChatUid = null;
-        let chatSubscriptions = {};
+        // Fungsi untuk menavigasi antar halaman
+        function showPage(pageId) {
+            pages.forEach(id => {
+                const page = document.getElementById(id);
+                if (page) {
+                    page.classList.add('hidden');
+                }
+            });
+            const currentPage = document.getElementById(pageId);
+            if (currentPage) {
+                currentPage.classList.remove('hidden');
+            }
+            // Logic khusus untuk chat page
+            if (pageId === 'chat-page' && isAdmin) {
+                document.getElementById('chat-list-sidebar').classList.remove('hidden');
+            } else if (pageId === 'chat-page' && !isAdmin) {
+                document.getElementById('chat-list-sidebar').classList.add('hidden');
+                currentActiveChat = null;
+                if (unsubscribeChat) {
+                    unsubscribeChat();
+                }
+                loadUserChat(currentUser.uid);
+            }
+        }
 
-        async function setupAdminChat() {
-            showPage('chat-page');
-            const userListDiv = document.getElementById('user-list');
-            document.getElementById('chat-list-sidebar').classList.remove('hidden');
+        function showAdminPage(sectionId) {
+            Object.keys(adminSections).forEach(id => {
+                adminSections[id].classList.add('hidden');
+            });
+            adminSections[sectionId].classList.remove('hidden');
+        }
 
-            const usersRef = collection(db, 'users');
-            onSnapshot(usersRef, (snapshot) => {
-                userListDiv.innerHTML = '';
-                snapshot.docs.forEach(userDoc => {
-                    const userData = userDoc.data();
-                    const userUid = userDoc.id;
-                    if (userUid === currentUser.uid) return; // Don't show admin in their own chat list
-                    const userBtn = document.createElement('button');
-                    userBtn.className = 'w-full text-left p-2 rounded-lg hover:bg-gray-100 transition-colors';
-                    userBtn.textContent = userData.email;
-                    userBtn.addEventListener('click', () => {
-                        setActiveAdminChat(userUid);
+        // Fungsi untuk memuat data produk dari Firestore
+        async function loadProducts() {
+            try {
+                const productsCol = collection(db, 'products');
+                const productsSnapshot = await getDocs(productsCol);
+                const productsContainer = document.getElementById('products-container');
+                productsContainer.innerHTML = '';
+                productsSnapshot.forEach(doc => {
+                    const product = doc.data();
+                    if (product.visible && product.stock > 0) {
+                        const discountPrice = product.discount > 0 ? (product.price - (product.price * product.discount / 100)).toFixed(0) : null;
+                        productsContainer.innerHTML += `
+                            <div class="product-card card-animate" onclick="showProductDetail('${doc.id}')">
+                                <div class="relative overflow-hidden">
+                                    <img src="${product.imageUrl || 'https://placehold.co/400x300/a8a8a8/white?text=No+Image'}" alt="${product.title}" class="w-full h-48 object-cover rounded-t-2xl">
+                                    <div class="absolute top-2 right-2 px-2 py-1 rounded-full text-white text-xs font-bold ${product.stock > 0 ? 'bg-green-500' : 'bg-red-500'}">
+                                        ${product.stock > 0 ? 'Stok: ' + product.stock : 'Stok Habis'}
+                                    </div>
+                                </div>
+                                <div class="p-4">
+                                    <div class="flex items-center justify-between mb-2">
+                                        <span class="text-sm text-gray-500">${product.platform}</span>
+                                        ${product.discount > 0 ? `<span class="badge bg-red-500 text-white">${product.discount}% OFF</span>` : ''}
+                                    </div>
+                                    <h3 class="text-lg font-semibold truncate mb-1">${product.title}</h3>
+                                    <div class="flex items-baseline space-x-2">
+                                        <span class="text-xl font-bold text-green-600">IDR ${discountPrice || product.price.toLocaleString('id-ID')}</span>
+                                        ${discountPrice ? `<span class="text-sm text-gray-500 line-through">IDR ${product.price.toLocaleString('id-ID')}</span>` : ''}
+                                    </div>
+                                </div>
+                            </div>
+                        `;
+                    }
+                });
+                
+                // Menambahkan listener untuk pencarian dan filter
+                document.querySelectorAll('[id^="filter-"]').forEach(btn => {
+                    btn.addEventListener('click', async () => {
+                        const platform = btn.id.split('-')[1];
+                        document.getElementById('products-container').innerHTML = '';
+                        let q;
+                        if (platform === 'all') {
+                            q = productsCol;
+                        } else {
+                            q = query(productsCol, where('platform', '==', platform.charAt(0).toUpperCase() + platform.slice(1)));
+                        }
+                        const filteredSnapshot = await getDocs(q);
+                        filteredSnapshot.forEach(doc => {
+                            const product = doc.data();
+                            if (product.visible && product.stock > 0) {
+                                // Render produk...
+                                const discountPrice = product.discount > 0 ? (product.price - (product.price * product.discount / 100)).toFixed(0) : null;
+                                productsContainer.innerHTML += `
+                                    <div class="product-card card-animate" onclick="showProductDetail('${doc.id}')">
+                                        <div class="relative overflow-hidden">
+                                            <img src="${product.imageUrl || 'https://placehold.co/400x300/a8a8a8/white?text=No+Image'}" alt="${product.title}" class="w-full h-48 object-cover rounded-t-2xl">
+                                            <div class="absolute top-2 right-2 px-2 py-1 rounded-full text-white text-xs font-bold ${product.stock > 0 ? 'bg-green-500' : 'bg-red-500'}">
+                                                ${product.stock > 0 ? 'Stok: ' + product.stock : 'Stok Habis'}
+                                            </div>
+                                        </div>
+                                        <div class="p-4">
+                                            <div class="flex items-center justify-between mb-2">
+                                                <span class="text-sm text-gray-500">${product.platform}</span>
+                                                ${product.discount > 0 ? `<span class="badge bg-red-500 text-white">${product.discount}% OFF</span>` : ''}
+                                            </div>
+                                            <h3 class="text-lg font-semibold truncate mb-1">${product.title}</h3>
+                                            <div class="flex items-baseline space-x-2">
+                                                <span class="text-xl font-bold text-green-600">IDR ${discountPrice || product.price.toLocaleString('id-ID')}</span>
+                                                ${discountPrice ? `<span class="text-sm text-gray-500 line-through">IDR ${product.price.toLocaleString('id-ID')}</span>` : ''}
+                                            </div>
+                                        </div>
+                                    </div>
+                                `;
+                            }
+                        });
                     });
-                    userListDiv.appendChild(userBtn);
                 });
-            });
+                document.getElementById('search-input').addEventListener('input', (e) => {
+                    const searchTerm = e.target.value.toLowerCase();
+                    const cards = productsContainer.querySelectorAll('.product-card');
+                    cards.forEach(card => {
+                        const title = card.querySelector('h3').innerText.toLowerCase();
+                        if (title.includes(searchTerm)) {
+                            card.style.display = 'block';
+                        } else {
+                            card.style.display = 'none';
+                        }
+                    });
+                });
+
+            } catch (e) {
+                console.error("Error loading products: ", e);
+            }
         }
 
-        function setActiveAdminChat(userUid) {
-            if (activeAdminChatUid === userUid) return;
-            activeAdminChatUid = userUid;
-            
-            // Clean up previous subscription
-            if (chatSubscriptions[activeAdminChatUid]) {
-                chatSubscriptions[activeAdminChatUid]();
+        async function showProductDetail(productId) {
+            try {
+                const productRef = doc(db, 'products', productId);
+                const productSnap = await getDoc(productRef);
+                if (productSnap.exists()) {
+                    const product = productSnap.data();
+                    const productDetailImage = document.getElementById('product-detail-image');
+                    const productDetailTitle = document.getElementById('product-detail-title');
+                    const productDetailPlatform = document.getElementById('product-detail-platform');
+                    const productDetailStock = document.getElementById('product-detail-stock');
+                    const productDetailPrice = document.getElementById('product-detail-price');
+                    const productDetailDiscountPrice = document.getElementById('product-detail-discount-price');
+                    const productDetailDiscountPercent = document.getElementById('product-detail-discount-percent');
+                    const productDetailDescription = document.getElementById('product-detail-description');
+                    const productDetailFeatures = document.getElementById('product-detail-features');
+                    const buyNowBtn = document.getElementById('buy-now-btn');
+
+                    const discountPrice = product.discount > 0 ? (product.price - (product.price * product.discount / 100)) : null;
+
+                    productDetailImage.src = product.imageUrl || 'https://placehold.co/600x400/a8a8a8/white?text=No+Image';
+                    productDetailTitle.innerText = product.title;
+                    productDetailPlatform.innerText = product.platform;
+                    productDetailStock.innerText = `Stok: ${product.stock}`;
+                    productDetailPrice.innerText = `IDR ${discountPrice ? discountPrice.toLocaleString('id-ID') : product.price.toLocaleString('id-ID')}`;
+                    
+                    if (discountPrice) {
+                        productDetailDiscountPrice.innerText = `IDR ${product.price.toLocaleString('id-ID')}`;
+                        productDetailDiscountPrice.classList.remove('hidden');
+                        productDetailDiscountPercent.innerText = `${product.discount}% OFF`;
+                        productDetailDiscountPercent.classList.remove('hidden');
+                    } else {
+                        productDetailDiscountPrice.classList.add('hidden');
+                        productDetailDiscountPercent.classList.add('hidden');
+                    }
+                    
+                    productDetailDescription.innerText = product.description;
+
+                    productDetailFeatures.innerHTML = '';
+                    if (product.features && product.features.length > 0) {
+                        product.features.forEach(feature => {
+                            const li = document.createElement('li');
+                            li.innerText = feature;
+                            productDetailFeatures.appendChild(li);
+                        });
+                    }
+                    
+                    buyNowBtn.onclick = () => {
+                        if (currentUser) {
+                            if (product.stock > 0) {
+                                // Logika untuk membuat pesanan dan mengurangi stok
+                                showCustomModal('Konfirmasi Pembelian', `Apakah Anda yakin ingin membeli ${product.title} seharga IDR ${discountPrice ? discountPrice.toLocaleString('id-ID') : product.price.toLocaleString('id-ID')}?`, async () => {
+                                    try {
+                                        const ordersCol = collection(db, 'orders');
+                                        await addDoc(ordersCol, {
+                                            productId: productId,
+                                            productTitle: product.title,
+                                            buyerId: currentUser.uid,
+                                            buyerEmail: currentUser.email,
+                                            status: 'pending',
+                                            accountText: product.accountText, // Menyimpan teks akun di pesanan
+                                            timestamp: serverTimestamp()
+                                        });
+
+                                        // Mengurangi stok produk
+                                        const newStock = product.stock - 1;
+                                        await updateDoc(productRef, { stock: newStock });
+                                        
+                                        // Arahkan ke WhatsApp dengan teks akun
+                                        const whatsappNumber = "6281944589876";
+                                        const message = `Halo KingzzStore, saya sudah order akun ${product.title}. Mohon bantuannya untuk pembayaran dan pengiriman akun. Terima kasih.`;
+                                        const whatsappUrl = `https://wa.me/${whatsappNumber}?text=${encodeURIComponent(message)}`;
+                                        window.open(whatsappUrl, '_blank');
+
+                                        // Setelah pembayaran selesai (simulasi), kirimkan akun secara otomatis
+                                        // Ini adalah simulasi. Dalam aplikasi nyata, ini akan dipicu oleh konfirmasi pembayaran.
+                                        setTimeout(async () => {
+                                            await deliverAccountText(ordersCol, currentUser.uid, product.accountText);
+                                        }, 5000); // Simulasi 5 detik setelah order
+
+                                        showCustomModal('Pesanan Berhasil', 'Pesanan Anda telah dibuat! Silakan lanjutkan pembayaran di WhatsApp.');
+
+                                        // Setelah berhasil, arahkan ke halaman produk dan tampilkan popup
+                                        history.pushState({ accountText: product.accountText }, '', '?payment_success=true');
+                                        showPage('product-list-page');
+
+                                    } catch (e) {
+                                        console.error("Error creating order: ", e);
+                                        showCustomModal('Gagal!', 'Terjadi kesalahan saat membuat pesanan.');
+                                    }
+                                });
+                            } else {
+                                showCustomModal('Stok Habis!', 'Maaf, stok produk ini sudah habis.');
+                            }
+                        } else {
+                            showCustomModal('Harap Login', 'Anda harus login untuk melakukan pembelian.');
+                        }
+                    };
+
+                    showPage('product-detail-page');
+                } else {
+                    showCustomModal('Produk Tidak Ditemukan', 'Produk yang Anda cari tidak ada.');
+                }
+            } catch (e) {
+                console.error("Error showing product detail: ", e);
+                showCustomModal('Gagal!', 'Terjadi kesalahan saat menampilkan detail produk.');
+            }
+        }
+
+        // Fungsi untuk mengirimkan teks akun secara otomatis
+        async function deliverAccountText(ordersColRef, userId, accountText) {
+            try {
+                // Temukan order yang relevan (contoh: status 'pending' untuk user ini)
+                const q = query(ordersColRef, where("buyerId", "==", userId), where("status", "==", "pending"));
+                const querySnapshot = await getDocs(q);
+                
+                if (!querySnapshot.empty) {
+                    const orderDoc = querySnapshot.docs[0];
+                    const orderRef = doc(db, 'orders', orderDoc.id);
+
+                    // Kirimkan teks akun ke chat user
+                    const chatRef = collection(db, 'chats', userId, 'messages');
+                    await addDoc(chatRef, {
+                        text: `Selamat! Pembayaran berhasil. Akun Anda:\n${accountText}`,
+                        senderId: 'admin',
+                        timestamp: serverTimestamp()
+                    });
+
+                    // Perbarui status pesanan menjadi 'completed'
+                    await updateDoc(orderRef, { status: 'completed' });
+                }
+            } catch (e) {
+                console.error("Error delivering account text: ", e);
+            }
+        }
+
+        // --- Perbaikan Bug Admin dan Chat ---
+
+        // Fungsi untuk memuat chat pengguna
+        function loadUserChat(userId) {
+            const messagesContainer = document.getElementById('chat-messages');
+            if (unsubscribeChat) {
+                unsubscribeChat();
             }
 
-            const chatRef = collection(db, `chats/${userUid}/messages`);
-            chatSubscriptions[userUid] = onSnapshot(chatRef, (snapshot) => {
-                chatMessagesDiv.innerHTML = '';
-                snapshot.docs.sort((a,b) => a.data().createdAt?.toDate() - b.data().createdAt?.toDate()).forEach(doc => {
-                    const msg = doc.data();
-                    const messageClass = msg.from === currentUser.uid ? 'bg-blue-100 self-end' : 'bg-gray-200 self-start';
-                    const messageDiv = document.createElement('div');
-                    messageDiv.className = `p-3 rounded-lg max-w-[80%] ${messageClass}`;
-                    messageDiv.textContent = msg.text;
-                    chatMessagesDiv.appendChild(messageDiv);
+            const q = query(collection(db, 'chats', userId, 'messages'), orderBy('timestamp'));
+            unsubscribeChat = onSnapshot(q, (snapshot) => {
+                messagesContainer.innerHTML = '';
+                snapshot.forEach(doc => {
+                    const message = doc.data();
+                    const isSelf = message.senderId === currentUser.uid;
+                    const messageClass = isSelf ? 'self' : 'other';
+                    messagesContainer.innerHTML += `
+                        <div class="chat-message ${messageClass}">
+                            <p>${message.text}</p>
+                            <span class="text-xs text-gray-500 mt-1 block text-right">${message.timestamp ? new Date(message.timestamp.toDate()).toLocaleTimeString() : ''}</span>
+                        </div>
+                    `;
                 });
-                chatMessagesDiv.scrollTop = chatMessagesDiv.scrollHeight;
+                messagesContainer.scrollTop = messagesContainer.scrollHeight;
             });
+            currentActiveChat = userId;
         }
 
+        // Fungsi untuk memuat daftar chat admin
+        async function loadAdminChats() {
+            const userListDiv = document.getElementById('user-list');
+            userListDiv.innerHTML = '';
+            const chatsCol = collection(db, 'chats');
+            const chatsSnapshot = await getDocs(chatsCol);
+            chatsSnapshot.forEach(doc => {
+                const userId = doc.id;
+                const userEmail = doc.data().email || 'User'; // Asumsi email disimpan di dokumen chat
+                
+                const userItem = document.createElement('div');
+                userItem.className = 'chat-user-item';
+                userItem.innerHTML = `<p class="font-semibold">${userEmail}</p><span class="text-xs text-gray-500">ID: ${userId.substring(0, 8)}...</span>`;
+                userItem.onclick = () => {
+                    document.querySelectorAll('.chat-user-item').forEach(el => el.classList.remove('active'));
+                    userItem.classList.add('active');
+                    loadUserChat(userId);
+                };
+                userListDiv.appendChild(userItem);
+            });
+        }
+        
+        // Menangani pengiriman pesan
         document.getElementById('chat-form').addEventListener('submit', async (e) => {
             e.preventDefault();
             const input = document.getElementById('chat-input');
             const text = input.value.trim();
-            if (!text) return;
-            
-            const targetUid = isAdmin ? activeAdminChatUid : currentUser.uid;
-            if (!targetUid) return showCustomModal('Error', 'Target chat tidak ditemukan.');
+            if (text === '') return;
 
-            await addDoc(collection(db, `chats/${targetUid}/messages`), {
-                from: currentUser.uid,
-                to: isAdmin ? activeAdminChatUid : 'admin',
-                text: text,
-                createdAt: serverTimestamp()
-            });
-
-            input.value = '';
-        });
-
-        // --- Admin Panel Functions ---
-        function showAdminPage(page) {
-            const sections = ['admin-dashboard-section', 'admin-products-section', 'admin-orders-section', 'admin-users-section', 'admin-ads-section', 'admin-logs-section'];
-            sections.forEach(id => document.getElementById(id).classList.add('hidden'));
-            document.getElementById(`admin-${page}-section`).classList.remove('hidden');
-
-            if (page === 'dashboard') loadAdminDashboard();
-            if (page === 'products') loadAdminProducts();
-            if (page === 'orders') loadAdminOrders();
-            if (page === 'users') loadAdminUsers();
-            if (page === 'ads') loadAdminAds();
-            if (page === 'logs') loadAdminLogs();
-        }
-
-        // Dashboard
-        async function loadAdminDashboard() {
-            const productsSnap = await getDocs(collection(db, 'products'));
-            const ordersSnap = await getDocs(collection(db, 'orders'));
-            
-            const pendingOrders = ordersSnap.docs.filter(doc => doc.data().status === 'pending').length;
-            
-            document.getElementById('dashboard-product-count').textContent = productsSnap.docs.length;
-            document.getElementById('dashboard-pending-orders').textContent = pendingOrders;
-            document.getElementById('dashboard-recent-chats').textContent = '0';
-        }
-
-        // Product CRUD
-        const productListAdmin = document.getElementById('product-list-admin');
-        const productFormModal = document.getElementById('product-form-modal');
-        const productForm = document.getElementById('product-form');
-        let currentProductAdmin = null;
-
-        async function loadAdminProducts() {
-            onSnapshot(collection(db, "products"), (snapshot) => {
-                productListAdmin.innerHTML = '';
-                snapshot.docs.forEach(doc => {
-                    const product = { id: doc.id, ...doc.data() };
-                    const productDiv = document.createElement('div');
-                    productDiv.className = 'bg-gray-50 p-4 rounded-lg flex flex-col md:flex-row md:items-center justify-between border border-gray-200';
-                    productDiv.innerHTML = `
-                        <div class="mb-2 md:mb-0">
-                            <p class="font-bold">${product.title}</p>
-                            <p class="text-sm text-gray-600">${product.platform} - Rp ${product.price.toLocaleString('id-ID')}</p>
-                            <p class="text-sm text-gray-600">Stok: ${product.stock}</p>
-                        </div>
-                        <div class="space-x-2 flex">
-                            <button class="btn-secondary" onclick="editProduct('${product.id}')">Edit</button>
-                            <button class="btn-danger" onclick="deleteProduct('${product.id}')">Hapus</button>
-                            <button class="btn-primary" onclick="showProductDetail('${product.id}')">Lihat</button>
-                        </div>
-                    `;
-                    productListAdmin.appendChild(productDiv);
-                });
-            });
-        }
-
-        async function editProduct(id) {
-            const docSnap = await getDoc(doc(db, "products", id));
-            if (docSnap.exists()) {
-                const data = docSnap.data();
-                currentProductAdmin = { id, ...data };
-                document.getElementById('product-form-title').textContent = 'Edit Produk';
-                document.getElementById('product-id').value = id;
-                document.getElementById('product-title').value = data.title;
-                document.getElementById('product-platform').value = data.platform;
-                document.getElementById('product-price').value = data.price;
-                document.getElementById('product-discount').value = data.discountPercent;
-                document.getElementById('product-stock').value = data.stock;
-                document.getElementById('product-description').value = data.description;
-                document.getElementById('product-image-url').value = data.imageUrl;
-                document.getElementById('product-account-text').value = data.accountText;
-                document.getElementById('product-visible').checked = data.visible;
-                productFormModal.classList.remove('hidden');
+            if (!currentUser) {
+                showCustomModal('Gagal!', 'Anda harus login untuk mengirim pesan.');
+                return;
             }
-        }
-
-        async function deleteProduct(id) {
-            if (window.confirm('Apakah Anda yakin ingin menghapus produk ini?')) {
-                await deleteDoc(doc(db, "products", id));
-                await addDoc(collection(db, "logs"), {
-                    actorId: currentUser.uid,
-                    action: 'delete_product',
-                    detail: `Hapus produk ID: ${id}`,
-                    timestamp: serverTimestamp()
-                });
-                showCustomModal('Berhasil', 'Produk berhasil dihapus.');
+            
+            // Tentukan receiver ID
+            let recipientId = currentActiveChat || 'admin';
+            if (isAdmin && currentActiveChat) {
+                // Admin mengirim pesan ke user yang sedang aktif
+                recipientId = currentActiveChat;
+            } else if (!isAdmin) {
+                // User mengirim pesan ke admin
+                recipientId = 'admin'; // Admin's user ID is 'admin'
+            } else {
+                 showCustomModal('Gagal!', 'Pilih pengguna yang ingin Anda kirim pesan.');
+                 return;
             }
-        }
-        
-        document.getElementById('add-product-btn').addEventListener('click', () => {
-            productFormModal.classList.remove('hidden');
-            document.getElementById('product-form-title').textContent = 'Tambah Produk Baru';
-            productForm.reset();
-            currentProductAdmin = null;
-        });
-        document.getElementById('product-form-cancel').addEventListener('click', () => productFormModal.classList.add('hidden'));
-
-        productForm.addEventListener('submit', async (e) => {
-            e.preventDefault();
-            const id = document.getElementById('product-id').value;
-            const data = {
-                title: document.getElementById('product-title').value,
-                platform: document.getElementById('product-platform').value,
-                price: Number(document.getElementById('product-price').value),
-                discountPercent: Number(document.getElementById('product-discount').value) || 0,
-                stock: Number(document.getElementById('product-stock').value) || 0,
-                description: document.getElementById('product-description').value,
-                imageUrl: document.getElementById('product-image-url').value,
-                accountText: document.getElementById('product-account-text').value,
-                visible: document.getElementById('product-visible').checked,
-                createdAt: serverTimestamp(),
-            };
-
-            const productRef = id ? doc(db, "products", id) : collection(db, "products");
+            
             try {
-                if (id) {
-                    await updateDoc(productRef, data);
-                    await addDoc(collection(db, "logs"), {
-                        actorId: currentUser.uid,
-                        action: 'update_product',
-                        detail: `Update produk ID: ${id}`,
-                        timestamp: serverTimestamp()
-                    });
-                } else {
-                    await addDoc(productRef, data);
-                    await addDoc(collection(db, "logs"), {
-                        actorId: currentUser.uid,
-                        action: 'add_product',
-                        detail: `Tambah produk: ${data.title}`,
-                        timestamp: serverTimestamp()
-                    });
+                const chatDocRef = doc(db, 'chats', recipientId);
+                const chatDocSnap = await getDoc(chatDocRef);
+                if (!chatDocSnap.exists()) {
+                    await setDoc(chatDocRef, { email: recipientId });
                 }
-                productFormModal.classList.add('hidden');
-                showCustomModal('Berhasil', 'Produk berhasil disimpan.');
-            } catch (error) {
-                showCustomModal('Error', 'Gagal menyimpan produk: ' + error.message);
-            }
-        });
 
-        // Order Management
-        const orderListAdmin = document.getElementById('order-list-admin');
-        const ordersRef = collection(db, "orders");
-        let allOrders = [];
-
-        async function loadAdminOrders() {
-            onSnapshot(ordersRef, (snapshot) => {
-                allOrders = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
-                renderAdminOrders();
-            });
-        }
-
-        function renderAdminOrders() {
-            orderListAdmin.innerHTML = '';
-            allOrders.sort((a,b) => b.createdAt?.toDate() - a.createdAt?.toDate()).forEach(order => {
-                const orderDiv = document.createElement('div');
-                orderDiv.className = 'bg-white p-4 rounded-lg shadow-md mb-2 border border-gray-200';
-                orderDiv.innerHTML = `
-                    <p class="font-bold">Pesanan #${order.id.slice(0, 8)}</p>
-                    <p class="text-sm text-gray-600">User ID: ${order.userId}</p>
-                    <p class="text-sm text-gray-600">Produk: ${order.productSnapshot?.title || 'N/A'}</p>
-                    <p class="text-sm">Status: <span class="font-semibold">${order.status}</span></p>
-                    <div class="mt-2 space-x-2">
-                        <button class="btn-secondary" onclick="showOrderDetails('${order.id}')">Detail</button>
-                    </div>
-                `;
-                orderListAdmin.appendChild(orderDiv);
-            });
-        }
-
-        async function showOrderDetails(orderId) {
-            const order = allOrders.find(o => o.id === orderId);
-            if (!order) return showCustomModal('Error', 'Pesanan tidak ditemukan.');
-            
-            const detailModal = document.createElement('div');
-            detailModal.className = 'modal';
-            detailModal.innerHTML = `
-                <div class="modal-content">
-                    <h3 class="text-2xl font-bold mb-4">Detail Pesanan #${order.id.slice(0, 8)}</h3>
-                    <div class="space-y-2 mb-4">
-                        <p><strong>Status:</strong> <span class="font-semibold">${order.status}</span></p>
-                        <p><strong>User ID:</strong> ${order.userId}</p>
-                        <p><strong>Produk:</strong> ${order.productSnapshot?.title || 'N/A'}</p>
-                        <p><strong>Harga:</strong> Rp ${order.pricePaid?.toLocaleString('id-ID') || 'N/A'}</p>
-                        <p><strong>Dibuat:</strong> ${order.createdAt?.toDate().toLocaleString() || 'N/A'}</p>
-                    </div>
-                    ${order.status === 'sent' ? `
-                        <div class="bg-green-100 p-4 rounded-lg mb-4">
-                            <p><strong>Akun yang dikirim:</strong></p>
-                            <pre class="bg-gray-200 p-2 rounded-lg whitespace-pre-wrap">${order.assignedAccountText}</pre>
-                        </div>
-                    ` : `
-                        <div class="input-group mb-4">
-                            <label>Paste Teks Akun di sini</label>
-                            <textarea id="account-paste-area" class="w-full p-2 border rounded-lg h-32" placeholder="Paste teks akun dari produk..."></textarea>
-                        </div>
-                        <div class="flex justify-end space-x-2">
-                            <button id="send-account-btn" class="btn-primary">Kirim Akun</button>
-                            <button id="mark-paid-btn" class="btn-secondary">Tandai Sudah Bayar</button>
-                            <button id="mark-problem-btn" class="btn-danger">Tandai Masalah</button>
-                        </div>
-                    `}
-                    <button class="absolute top-4 right-4 text-2xl font-bold text-gray-400 hover:text-gray-600" onclick="this.closest('.modal').remove()">&times;</button>
-                </div>
-            `;
-            document.body.appendChild(detailModal);
-            
-            if (order.status !== 'sent') {
-                document.getElementById('send-account-btn').addEventListener('click', async () => {
-                    const accountText = document.getElementById('account-paste-area').value.trim();
-                    if (!accountText) {
-                        return showCustomModal('Peringatan', 'Silakan paste teks akun terlebih dahulu.');
-                    }
-                    await updateDoc(doc(db, "orders", orderId), {
-                        status: 'sent',
-                        assignedAccountText: accountText,
-                        adminId: currentUser.uid,
-                        sentAt: serverTimestamp()
-                    });
-                    await addDoc(collection(db, "logs"), {
-                        actorId: currentUser.uid,
-                        action: 'send_account',
-                        detail: `Kirim akun untuk pesanan ID: ${orderId}`,
-                        timestamp: serverTimestamp()
-                    });
-                    showCustomModal('Berhasil', 'Akun berhasil dikirim!');
-                    detailModal.remove();
-                });
-                document.getElementById('mark-paid-btn').addEventListener('click', () => updateOrderStatus(orderId, 'paid', detailModal));
-                document.getElementById('mark-problem-btn').addEventListener('click', () => updateOrderStatus(orderId, 'problem', detailModal));
-            }
-        }
-
-        async function updateOrderStatus(orderId, status, modal) {
-            await updateDoc(doc(db, "orders", orderId), {
-                status: status,
-                adminId: currentUser.uid,
-                updatedAt: serverTimestamp()
-            });
-            await addDoc(collection(db, "logs"), {
-                actorId: currentUser.uid,
-                action: `update_order_status`,
-                detail: `Ubah status pesanan ID ${orderId} menjadi ${status}`,
-                timestamp: serverTimestamp()
-            });
-            showCustomModal('Berhasil', `Status pesanan berhasil diubah menjadi "${status}".`);
-            if(modal) modal.remove();
-        }
-
-        // User Management
-        const userListAdmin = document.getElementById('user-list-admin');
-        const addUserModal = document.getElementById('add-user-modal');
-        const addUserForm = document.getElementById('add-user-form');
-
-        async function loadAdminUsers() {
-            onSnapshot(collection(db, "users"), (snapshot) => {
-                userListAdmin.innerHTML = '';
-                snapshot.docs.forEach(doc => {
-                    const user = { id: doc.id, ...doc.data() };
-                    const userDiv = document.createElement('div');
-                    userDiv.className = 'bg-gray-50 p-4 rounded-lg flex flex-col md:flex-row md:items-center justify-between border border-gray-200';
-                    const banBtnText = user.isBanned ? 'Unban' : 'Ban';
-                    const banBtnClass = user.isBanned ? 'btn-secondary' : 'btn-danger';
-                    userDiv.innerHTML = `
-                        <div class="mb-2 md:mb-0">
-                            <p class="font-bold">${user.email}</p>
-                            <p class="text-sm text-gray-600">ID: ${user.id}</p>
-                            <p class="text-sm text-gray-600">Peran: ${user.role || 'user'}</p>
-                            ${user.isBanned ? `<span class="badge bg-red-500 text-white mt-1">Diblokir</span>` : ''}
-                        </div>
-                        <div class="space-x-2 flex">
-                            <button class="${banBtnClass}" onclick="toggleUserBan('${user.id}', ${user.isBanned})">${banBtnText}</button>
-                            <button class="btn-danger" onclick="deleteUser('${user.id}')">Hapus</button>
-                        </div>
-                    `;
-                    userListAdmin.appendChild(userDiv);
-                });
-            });
-        }
-        
-        document.getElementById('add-user-btn').addEventListener('click', () => {
-            addUserModal.classList.remove('hidden');
-            addUserForm.reset();
-        });
-        document.getElementById('add-user-cancel').addEventListener('click', () => addUserModal.classList.add('hidden'));
-
-        addUserForm.addEventListener('submit', async (e) => {
-            e.preventDefault();
-            const email = document.getElementById('add-user-email').value;
-            const password = document.getElementById('add-user-password').value;
-            const role = document.getElementById('add-user-role').value;
-
-            try {
-                const userCredential = await createUserWithEmailAndPassword(auth, email, password);
-                await setDoc(doc(db, "users", userCredential.user.uid), {
-                    email: email,
-                    role: role,
-                    isBanned: false,
-                    createdAt: serverTimestamp()
-                });
-                addUserModal.classList.add('hidden');
-                showCustomModal('Berhasil', `Pengguna ${email} berhasil ditambahkan.`);
-            } catch (error) {
-                showCustomModal('Error', 'Gagal menambah pengguna: ' + error.message);
-            }
-        });
-
-        async function toggleUserBan(userId, isBanned) {
-            const newStatus = !isBanned;
-            await updateDoc(doc(db, "users", userId), { isBanned: newStatus });
-            await addDoc(collection(db, "logs"), {
-                actorId: currentUser.uid,
-                action: newStatus ? 'ban_user' : 'unban_user',
-                detail: `${newStatus ? 'Blokir' : 'Buka blokir'} pengguna ID: ${userId}`,
-                timestamp: serverTimestamp()
-            });
-            showCustomModal('Berhasil', `Status pengguna berhasil diubah.`);
-        }
-
-        async function deleteUser(userId) {
-            if (window.confirm('Apakah Anda yakin ingin menghapus pengguna ini secara permanen?')) {
-                // Note: Deleting user via Firestore doesn't delete auth user. This is a limitation.
-                await deleteDoc(doc(db, "users", userId));
-                await addDoc(collection(db, "logs"), {
-                    actorId: currentUser.uid,
-                    action: 'delete_user',
-                    detail: `Hapus data pengguna ID: ${userId}`,
+                const chatRef = collection(db, 'chats', recipientId, 'messages');
+                await addDoc(chatRef, {
+                    text: text,
+                    senderId: currentUser.uid,
                     timestamp: serverTimestamp()
                 });
-                showCustomModal('Berhasil', 'Data pengguna berhasil dihapus dari database.');
+                input.value = '';
+            } catch (e) {
+                console.error("Error sending message: ", e);
+                showCustomModal('Gagal!', 'Terjadi kesalahan saat mengirim pesan.');
             }
-        }
-
-        // Ads Management
-        const adsForm = document.getElementById('ads-form');
-        const adsDocRef = doc(db, "settings", "ads");
-
-        async function loadAdminAds() {
-            const docSnap = await getDoc(adsDocRef);
-            if (docSnap.exists()) {
-                const data = docSnap.data();
-                document.getElementById('ads-type').value = data.type || 'text';
-                document.getElementById('ads-value').value = data.value || '';
-                document.getElementById('ads-active').checked = data.active;
-            }
-        }
-
-        adsForm.addEventListener('submit', async (e) => {
-            e.preventDefault();
-            const data = {
-                type: document.getElementById('ads-type').value,
-                value: document.getElementById('ads-value').value,
-                active: document.getElementById('ads-active').checked
-            };
-            await setDoc(adsDocRef, data);
-            showCustomModal('Berhasil', 'Iklan berhasil diperbarui.');
-            loadAds(); // Reload on user side
         });
-        
-        // Logs
-        const logsContainer = document.getElementById('logs-container');
-        async function loadAdminLogs() {
-            onSnapshot(collection(db, "logs"), (snapshot) => {
-                logsContainer.innerHTML = '';
-                snapshot.docs.sort((a, b) => b.data().timestamp?.toDate() - a.data().timestamp?.toDate()).forEach(doc => {
-                    const log = doc.data();
-                    const logDiv = document.createElement('div');
-                    logDiv.className = 'bg-gray-100 p-3 rounded-lg';
-                    logDiv.innerHTML = `
-                        <p class="text-sm font-semibold">${log.action} - ${log.timestamp?.toDate().toLocaleString()}</p>
-                        <p class="text-xs text-gray-700">Oleh: ${log.actorId.slice(0, 8)}...</p>
-                        <p class="text-xs text-gray-700">${log.detail}</p>
-                    `;
-                    logsContainer.appendChild(logDiv);
-                });
-            });
-        }
 
-        // --- Event Listeners & Initial Load ---
+        // --- Fungsionalitas Login, Register, Logout ---
+
+        document.getElementById('auth-form').addEventListener('submit', async (e) => {
+            e.preventDefault();
+            const email = document.getElementById('auth-email').value;
+            const password = document.getElementById('auth-password').value;
+            const authTitle = document.getElementById('auth-title').innerText;
+
+            try {
+                if (authTitle === 'Login') {
+                    await setPersistence(auth, browserSessionPersistence);
+                    await signInWithEmailAndPassword(auth, email, password);
+                    showCustomModal('Login Berhasil', 'Selamat datang kembali!');
+                    showPage('home-page');
+                } else {
+                    const userCredential = await createUserWithEmailAndPassword(auth, email, password);
+                    const userRef = doc(db, 'users', userCredential.user.uid);
+                    await setDoc(userRef, {
+                        email: userCredential.user.email,
+                        role: 'user',
+                        createdAt: serverTimestamp()
+                    });
+                    showCustomModal('Pendaftaran Berhasil', 'Akun Anda berhasil dibuat. Silakan login.');
+                    document.getElementById('auth-title').innerText = 'Login';
+                    document.getElementById('auth-submit-btn').innerText = 'Login';
+                    document.getElementById('auth-switch').innerHTML = `Belum punya akun? <a href="#" id="switch-to-register" class="text-blue-600 hover:underline font-semibold">Daftar sekarang</a>`;
+                }
+            } catch (error) {
+                console.error("Authentication Error: ", error);
+                showCustomModal('Gagal!', error.message);
+            }
+        });
+
+        // --- On Auth State Changed ---
+        onAuthStateChanged(auth, async (user) => {
+            currentUser = user;
+            if (user) {
+                navBtns.login.classList.add('hidden');
+                navBtns.logout.classList.remove('hidden');
+                // Perbaikan bug admin: Cek peran dari Firestore
+                try {
+                    const userDoc = await getDoc(doc(db, 'users', user.uid));
+                    if (userDoc.exists()) {
+                        const userData = userDoc.data();
+                        if (userData.role === 'admin') {
+                            isAdmin = true;
+                            navBtns.admin.classList.remove('hidden');
+                            // Load admin specific data
+                            loadAdminChats();
+                        } else {
+                            isAdmin = false;
+                            navBtns.admin.classList.add('hidden');
+                        }
+                    }
+                    if (isAdmin) {
+                        loadAdminStats();
+                        loadAdminProducts();
+                        loadAdminOrders();
+                        loadAdminUsers();
+                    }
+                } catch (e) {
+                    console.error("Error getting user role:", e);
+                    isAdmin = false;
+                    navBtns.admin.classList.add('hidden');
+                }
+            } else {
+                currentUser = null;
+                isAdmin = false;
+                navBtns.login.classList.remove('hidden');
+                navBtns.logout.classList.add('hidden');
+                navBtns.admin.classList.add('hidden');
+                if (unsubscribeChat) {
+                    unsubscribeChat();
+                }
+            }
+            // Tangani pop-up pembayaran berhasil saat restart
+            const urlParams = new URLSearchParams(window.location.search);
+            if (urlParams.get('payment_success') === 'true') {
+                const accountText = history.state?.accountText;
+                if (accountText) {
+                    showPaymentSuccessModal(accountText);
+                }
+            }
+        });
+
+        // --- Event Listeners UI ---
+
         navBtns.home.addEventListener('click', () => showPage('home-page'));
         document.getElementById('home-btn-products').addEventListener('click', () => showPage('product-list-page'));
         navBtns.products.addEventListener('click', () => showPage('product-list-page'));
-        navBtns.chat.addEventListener('click', () => {
-            if (currentUser) {
-                if (isAdmin) setupAdminChat();
-                else setupUserChat();
-                showPage('chat-page');
-            } else {
-                showPage('auth-page');
-            }
-        });
         document.getElementById('home-btn-chat').addEventListener('click', () => {
             if (currentUser) {
                 showPage('chat-page');
             } else {
+                showCustomModal('Harap Login', 'Anda harus login untuk mengakses fitur chat.');
+                showPage('auth-page');
+            }
+        });
+        navBtns.chat.addEventListener('click', () => {
+            if (currentUser) {
+                showPage('chat-page');
+            } else {
+                showCustomModal('Harap Login', 'Anda harus login untuk mengakses fitur chat.');
                 showPage('auth-page');
             }
         });
@@ -1229,28 +1018,253 @@
         });
         navBtns.admin.addEventListener('click', () => showPage('admin-panel'));
 
-        window.onload = () => {
-            onAuthStateChanged(auth, user => {
-                if (user && user.email === adminEmail) {
-                    navBtns.admin.classList.remove('hidden');
-                    showAdminPage('dashboard');
+        document.getElementById('switch-to-register').addEventListener('click', (e) => {
+            e.preventDefault();
+            document.getElementById('auth-title').innerText = 'Daftar';
+            document.getElementById('auth-submit-btn').innerText = 'Daftar';
+            document.getElementById('auth-switch').innerHTML = `Sudah punya akun? <a href="#" id="switch-to-login" class="text-blue-600 hover:underline font-semibold">Login sekarang</a>`;
+            document.getElementById('switch-to-login').addEventListener('click', (e) => {
+                e.preventDefault();
+                document.getElementById('auth-title').innerText = 'Login';
+                document.getElementById('auth-submit-btn').innerText = 'Login';
+                document.getElementById('auth-switch').innerHTML = `Belum punya akun? <a href="#" id="switch-to-register" class="text-blue-600 hover:underline font-semibold">Daftar sekarang</a>`;
+                document.getElementById('switch-to-register').addEventListener('click', (e) => {
+                     e.preventDefault();
+                     document.getElementById('auth-title').innerText = 'Daftar';
+                     document.getElementById('auth-submit-btn').innerText = 'Daftar';
+                     document.getElementById('auth-switch').innerHTML = `Sudah punya akun? <a href="#" id="switch-to-login" class="text-blue-600 hover:underline font-semibold">Login sekarang</a>`;
+                });
+            });
+        });
+
+        // --- Admin Panel Functions (diperbaiki dan diorganisir) ---
+
+        let currentProductId = null;
+        const productFormModal = document.getElementById('product-form-modal');
+        const productForm = document.getElementById('product-form');
+        const productFormTitle = document.getElementById('product-form-title');
+        const addProductBtn = document.getElementById('add-product-btn');
+        const productFormCancelBtn = document.getElementById('product-form-cancel');
+
+        addProductBtn.addEventListener('click', () => {
+            productFormTitle.innerText = 'Tambah Produk';
+            productForm.reset();
+            currentProductId = null;
+            productFormModal.classList.remove('hidden');
+        });
+
+        productFormCancelBtn.addEventListener('click', () => {
+            productFormModal.classList.add('hidden');
+        });
+
+        productForm.addEventListener('submit', async (e) => {
+            e.preventDefault();
+            const productData = {
+                title: document.getElementById('product-title').value,
+                platform: document.getElementById('product-platform').value,
+                price: parseFloat(document.getElementById('product-price').value),
+                discount: parseFloat(document.getElementById('product-discount').value) || 0,
+                stock: parseInt(document.getElementById('product-stock').value),
+                description: document.getElementById('product-description').value,
+                imageUrl: document.getElementById('product-image-url').value,
+                accountText: document.getElementById('product-account-text').value,
+                visible: document.getElementById('product-visible').checked,
+            };
+            try {
+                if (currentProductId) {
+                    await updateDoc(doc(db, 'products', currentProductId), productData);
+                    showCustomModal('Berhasil!', 'Produk berhasil diperbarui.');
                 } else {
-                    navBtns.admin.classList.add('hidden');
+                    await addDoc(collection(db, 'products'), productData);
+                    showCustomModal('Berhasil!', 'Produk berhasil ditambahkan.');
+                }
+                productFormModal.classList.add('hidden');
+                loadAdminProducts();
+                loadProducts();
+            } catch (e) {
+                console.error("Error saving product: ", e);
+                showCustomModal('Gagal!', 'Terjadi kesalahan saat menyimpan produk.');
+            }
+        });
+
+        async function loadAdminProducts() {
+            const productListAdmin = document.getElementById('product-list-admin');
+            productListAdmin.innerHTML = '';
+            const q = query(collection(db, 'products'));
+            const productsSnapshot = await getDocs(q);
+            productsSnapshot.forEach(doc => {
+                const product = doc.data();
+                productListAdmin.innerHTML += `
+                    <div class="bg-gray-50 p-4 rounded-lg flex items-center justify-between border border-gray-200">
+                        <div>
+                            <p class="font-semibold">${product.title}</p>
+                            <p class="text-sm text-gray-600">ID: ${doc.id}</p>
+                            <p class="text-sm text-gray-600">Stok: ${product.stock}</p>
+                        </div>
+                        <div class="flex space-x-2">
+                            <button class="btn-secondary text-sm" onclick="editProduct('${doc.id}')">Edit</button>
+                            <button class="btn-danger text-sm" onclick="deleteProduct('${doc.id}')">Hapus</button>
+                        </div>
+                    </div>
+                `;
+            });
+            document.getElementById('dashboard-product-count').innerText = productsSnapshot.size;
+        }
+
+        async function editProduct(id) {
+            const productRef = doc(db, 'products', id);
+            const productSnap = await getDoc(productRef);
+            if (productSnap.exists()) {
+                const product = productSnap.data();
+                document.getElementById('product-form-title').innerText = 'Edit Produk';
+                document.getElementById('product-id').value = id;
+                document.getElementById('product-title').value = product.title;
+                document.getElementById('product-platform').value = product.platform;
+                document.getElementById('product-price').value = product.price;
+                document.getElementById('product-discount').value = product.discount;
+                document.getElementById('product-stock').value = product.stock;
+                document.getElementById('product-description').value = product.description;
+                document.getElementById('product-image-url').value = product.imageUrl;
+                document.getElementById('product-account-text').value = product.accountText;
+                document.getElementById('product-visible').checked = product.visible;
+                currentProductId = id;
+                productFormModal.classList.remove('hidden');
+            }
+        }
+        
+        async function deleteProduct(id) {
+            showCustomModal('Konfirmasi', 'Apakah Anda yakin ingin menghapus produk ini?', async () => {
+                try {
+                    await deleteDoc(doc(db, 'products', id));
+                    showCustomModal('Berhasil!', 'Produk berhasil dihapus.');
+                    loadAdminProducts();
+                    loadProducts();
+                } catch (e) {
+                    console.error("Error deleting product: ", e);
+                    showCustomModal('Gagal!', 'Terjadi kesalahan saat menghapus produk.');
                 }
             });
-            showPage('home-page');
-            loadAds();
-            loadProducts();
-        };
+        }
+
+        async function loadAdminOrders() {
+            const orderListAdmin = document.getElementById('order-list-admin');
+            orderListAdmin.innerHTML = '';
+            const ordersCol = collection(db, 'orders');
+            const q = query(ordersCol, where('status', '==', 'pending'));
+            const ordersSnapshot = await getDocs(q);
+            ordersSnapshot.forEach(doc => {
+                const order = doc.data();
+                const timestamp = order.timestamp ? new Date(order.timestamp.toDate()).toLocaleString() : 'N/A';
+                orderListAdmin.innerHTML += `
+                    <div class="bg-gray-50 p-4 rounded-lg border border-gray-200">
+                        <p class="font-semibold">Produk: ${order.productTitle}</p>
+                        <p class="text-sm text-gray-600">Pembeli: ${order.buyerEmail}</p>
+                        <p class="text-sm text-gray-600">Status: <span class="badge bg-yellow-400 text-yellow-900">${order.status}</span></p>
+                        <p class="text-xs text-gray-500 mt-2">ID: ${doc.id.substring(0, 8)}...</p>
+                        <p class="text-xs text-gray-500">Tanggal: ${timestamp}</p>
+                    </div>
+                `;
+            });
+            document.getElementById('dashboard-pending-orders').innerText = ordersSnapshot.size;
+        }
+
+        async function loadAdminUsers() {
+            const userListAdmin = document.getElementById('user-list-admin');
+            userListAdmin.innerHTML = '';
+            const usersCol = collection(db, 'users');
+            const usersSnapshot = await getDocs(usersCol);
+            usersSnapshot.forEach(doc => {
+                const user = doc.data();
+                userListAdmin.innerHTML += `
+                    <div class="bg-gray-50 p-4 rounded-lg flex items-center justify-between border border-gray-200">
+                        <div>
+                            <p class="font-semibold">${user.email}</p>
+                            <p class="text-sm text-gray-600">ID: ${doc.id.substring(0, 8)}...</p>
+                            <p class="text-sm text-gray-600">Peran: ${user.role}</p>
+                        </div>
+                        <div class="flex space-x-2">
+                             <button class="btn-danger text-sm" onclick="deleteUser('${doc.id}')">Hapus</button>
+                        </div>
+                    </div>
+                `;
+            });
+        }
+        
+        async function addUser(email, password, role) {
+            try {
+                // Buat user di Authentication
+                const userCredential = await createUserWithEmailAndPassword(auth, email, password);
+                const user = userCredential.user;
+                // Simpan peran user di Firestore
+                const userRef = doc(db, 'users', user.uid);
+                await setDoc(userRef, { email: user.email, role: role, createdAt: serverTimestamp() });
+                showCustomModal('Berhasil!', `Pengguna ${user.email} berhasil ditambahkan sebagai ${role}.`);
+                loadAdminUsers();
+            } catch (e) {
+                console.error("Error adding user: ", e);
+                showCustomModal('Gagal!', e.message);
+            }
+        }
+        
+        document.getElementById('add-user-btn').addEventListener('click', () => {
+             document.getElementById('add-user-modal').classList.remove('hidden');
+        });
+        document.getElementById('add-user-cancel').addEventListener('click', () => {
+             document.getElementById('add-user-modal').classList.add('hidden');
+        });
+        document.getElementById('add-user-form').addEventListener('submit', async (e) => {
+            e.preventDefault();
+            const email = document.getElementById('add-user-email').value;
+            const password = document.getElementById('add-user-password').value;
+            const role = document.getElementById('add-user-role').value;
+            await addUser(email, password, role);
+            document.getElementById('add-user-modal').classList.add('hidden');
+        });
 
         // Expose functions for buttons
         window.showAdminPage = showAdminPage;
         window.showProductDetail = showProductDetail;
         window.editProduct = editProduct;
         window.deleteProduct = deleteProduct;
-        window.showOrderDetails = showOrderDetails;
-        window.toggleUserBan = toggleUserBan;
         window.deleteUser = deleteUser;
+
+        // Inisialisasi
+        window.onload = () => {
+            showPage('home-page');
+            loadProducts();
+        };
+
+        async function deleteUser(id) {
+            showCustomModal('Konfirmasi', 'Apakah Anda yakin ingin menghapus pengguna ini? Tindakan ini tidak dapat dibatalkan.', async () => {
+                try {
+                    // Hapus user dari Firestore (tidak bisa menghapus dari Auth dengan cara ini)
+                    await deleteDoc(doc(db, 'users', id));
+                    showCustomModal('Berhasil!', 'Pengguna berhasil dihapus.');
+                    loadAdminUsers();
+                } catch (e) {
+                    console.error("Error deleting user: ", e);
+                    showCustomModal('Gagal!', 'Terjadi kesalahan saat menghapus pengguna.');
+                }
+            });
+        }
+
+        async function loadAdminStats() {
+            try {
+                const productsSnapshot = await getDocs(collection(db, 'products'));
+                document.getElementById('dashboard-product-count').innerText = productsSnapshot.size;
+
+                const pendingOrdersQuery = query(collection(db, 'orders'), where('status', '==', 'pending'));
+                const pendingOrdersSnapshot = await getDocs(pendingOrdersQuery);
+                document.getElementById('dashboard-pending-orders').innerText = pendingOrdersSnapshot.size;
+
+                // Load chat stats
+                const chatsCol = collection(db, 'chats');
+                const chatsSnapshot = await getDocs(chatsCol);
+                document.getElementById('dashboard-recent-chats').innerText = chatsSnapshot.size;
+            } catch (e) {
+                console.error("Error loading admin stats: ", e);
+            }
+        }
     </script>
 </body>
 </html>
