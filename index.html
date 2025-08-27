@@ -568,7 +568,9 @@
                 if (unsubscribeChat) {
                     unsubscribeChat();
                 }
-                loadUserChat(currentUser.uid);
+                if (currentUser) {
+                    loadUserChat(currentUser.uid);
+                }
             }
         }
 
@@ -618,7 +620,7 @@
                 document.querySelectorAll('[id^="filter-"]').forEach(btn => {
                     btn.addEventListener('click', async () => {
                         const platform = btn.id.split('-')[1];
-                        document.getElementById('products-container').innerHTML = '';
+                        productsContainer.innerHTML = '';
                         let q;
                         if (platform === 'all') {
                             q = productsCol;
@@ -937,8 +939,19 @@
             }
         });
 
+        // Fungsi untuk menginisialisasi panel admin setelah peran dikonfirmasi
+        async function initAdminPanel() {
+             console.log("Initializing admin panel...");
+             loadAdminChats();
+             loadAdminStats();
+             loadAdminProducts();
+             loadAdminOrders();
+             loadAdminUsers();
+        }
+
         // --- On Auth State Changed ---
         onAuthStateChanged(auth, async (user) => {
+            console.log('User state changed:', user ? 'Logged in' : 'Logged out');
             currentUser = user;
             if (user) {
                 navBtns.login.classList.add('hidden');
@@ -946,24 +959,15 @@
                 // Perbaikan bug admin: Cek peran dari Firestore
                 try {
                     const userDoc = await getDoc(doc(db, 'users', user.uid));
-                    if (userDoc.exists()) {
-                        const userData = userDoc.data();
-                        if (userData.role === 'admin') {
-                            isAdmin = true;
-                            navBtns.admin.classList.remove('hidden');
-                            // Panggil semua fungsi admin di sini setelah peran dikonfirmasi
-                            loadAdminChats();
-                            loadAdminStats();
-                            loadAdminProducts();
-                            loadAdminOrders();
-                            loadAdminUsers();
-                        } else {
-                            isAdmin = false;
-                            navBtns.admin.classList.add('hidden');
-                        }
+                    console.log('User data fetched from Firestore:', userDoc.exists() ? userDoc.data() : 'User document not found');
+
+                    if (userDoc.exists() && userDoc.data().role === 'admin') {
+                        isAdmin = true;
+                        navBtns.admin.classList.remove('hidden');
+                        initAdminPanel();
                     } else {
-                       isAdmin = false;
-                       navBtns.admin.classList.add('hidden');
+                        isAdmin = false;
+                        navBtns.admin.classList.add('hidden');
                     }
                 } catch (e) {
                     console.error("Error getting user role:", e);
